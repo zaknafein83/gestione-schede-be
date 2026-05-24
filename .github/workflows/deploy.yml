@@ -1,0 +1,110 @@
+name: deploy
+
+# Trigger su ogni push a main: test → build → push GHCR → ssh deploy → health.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: backend-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/zaknafein83/gestione-schede-be
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # Quarkus Dev Services usa Testcontainers per avviare Mongo durante
+      # i test. Il runner ubuntu-latest ha Docker disponibile.
+      - name: Backend tests
+        run: ./mvnw -B test
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST:    ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
+            || { echo "::error::chiave SSH malformata"; exit 1; }
+          ssh-keyscan -4 -T 15 -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Sync docker-compose.yml to VPS
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          scp -4 -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new \
+            docker-compose.yml \
+            "$VPS_USER@$VPS_HOST:/opt/gestione-schede/docker-compose.yml"
+
+      - name: Pull + restart
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          TAG:      ${{ github.sha }}
+        run: |
+          ssh -4 -i ~/.ssh/deploy_key "$VPS_USER@$VPS_HOST" bash <<EOF
+            set -euo pipefail
+            cd /opt/gestione-schede
+            echo "TAG=$TAG" > .deploy-tag
+            export TAG=$TAG
+            docker compose pull app
+            docker compose up -d --remove-orphans
+            sleep 5
+            docker compose ps
+          EOF
+
+      - name: Health check (via nginx public URL)
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS https://pg.zaknafein.ovh/api/q/health/ready > /dev/null; then
+              echo "✓ backend ready"
+              exit 0
+            fi
+            echo "waiting ($i/12)..."
+            sleep 5
+          done
+          echo "::error::backend health check failed after 60s"
+          exit 1

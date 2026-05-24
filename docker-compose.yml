@@ -1,0 +1,76 @@
+# Compose di PRODUZIONE.
+#
+# Vive in /opt/gestione-schede/docker-compose.yml sul VPS, sincronizzato dal
+# workflow GitHub Actions ad ogni push su main. Il backend gira come immagine
+# GHCR (build sul runner, push, pull sul VPS). MongoDB locale al container.
+#
+# Per il compose di sviluppo (mongo + mailpit con porte esposte), usare:
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Variabili d'ambiente richieste (vivono in /opt/gestione-schede/.env, NON
+# in repo). Vedi README sez. "Deploy".
+
+services:
+
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: dndsheets
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE:      dndsheets
+    volumes:
+      - mongo-data:/data/db
+    # Bind locale opzionale: lasciato chiuso in prod (il backend lo raggiunge
+    # via rete Docker interna). Aprilo a 127.0.0.1:27017 solo per debug.
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  app:
+    image: ghcr.io/zaknafein83/gestione-schede-be:${TAG:-latest}
+    # build di fallback per uso locale (`docker compose up --build`): in prod
+    # l'immagine viene pullata da GHCR.
+    build: .
+    restart: unless-stopped
+    ports:
+      # Bind locale 127.0.0.1: nginx davanti fa proxy a questa porta.
+      # Cambiare 8082 se confligge con altri progetti (vedi /opt/.ports-registry).
+      - "127.0.0.1:8082:8080"
+    environment:
+      QUARKUS_PROFILE: prod
+      MONGO_URI:       mongodb://dndsheets:${MONGO_PASSWORD}@mongo:27017/dndsheets?authSource=admin
+      MONGO_DATABASE:  dndsheets
+      APP_BASE_URL:    ${APP_BASE_URL}
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
+      # SMTP (default Resend, override via env per altri provider)
+      SMTP_HOST:       ${SMTP_HOST:-smtp.resend.com}
+      SMTP_PORT:       ${SMTP_PORT:-465}
+      SMTP_START_TLS:  ${SMTP_START_TLS:-REQUIRED}
+      SMTP_AUTH:       ${SMTP_AUTH:-PLAIN}
+      SMTP_USERNAME:   ${SMTP_USERNAME}
+      SMTP_PASSWORD:   ${SMTP_PASSWORD}
+      SMTP_FROM:       ${SMTP_FROM}
+      # Chiavi JWT RS256: montate read-only dal filesystem host.
+      JWT_PUBLIC_KEY_PATH:  file:/keys/publicKey.pem
+      JWT_PRIVATE_KEY_PATH: file:/keys/privateKey.pem
+    volumes:
+      # Generate una volta sull'host (vedi README), chmod 600 owner deploy:
+      #   openssl genrsa -out privateKey.pem 2048
+      #   openssl rsa -in privateKey.pem -pubout -out publicKey.pem
+      - /etc/dndsheets/jwt:/keys:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/q/health/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+volumes:
+  mongo-data:

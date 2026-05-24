@@ -19,6 +19,18 @@ jobs:
     permissions:
       contents: read
       packages: write
+    services:
+      # Mongo come "service container": parte prima del job, pre-pull veloce
+      # del runner, healthcheck integrato. Preferito a Dev Services di
+      # Quarkus (Testcontainers richiede pull a ogni run e dà flakiness).
+      mongo:
+        image: mongo:8
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -28,9 +40,11 @@ jobs:
           java-version: '25'
           cache: maven
 
-      # Quarkus Dev Services usa Testcontainers per avviare Mongo durante
-      # i test. Il runner ubuntu-latest ha Docker disponibile.
+      # Punto Quarkus al service Mongo del runner. Settando questa env var,
+      # Dev Services NON avvia il proprio container (vede già una URI).
       - name: Backend tests
+        env:
+          QUARKUS_MONGODB_CONNECTION_STRING: mongodb://localhost:27017
         run: ./mvnw -B test
 
       - uses: docker/setup-buildx-action@v3

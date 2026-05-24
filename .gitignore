@@ -43,3 +43,8 @@ nb-configuration.xml
 /.quarkus/cli/plugins/
 # TLS Certificates
 .certs/
+
+# JWT keypair dev — generate localmente al primo clone, NON committare.
+# In prod usate quelle in /etc/dndsheets/jwt/ montate via volume Docker.
+src/main/resources/jwt/*.pem
+

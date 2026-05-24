@@ -1,5 +1,15 @@
-*
-!target/*-runner
-!target/*-runner.jar
-!target/lib/*
-!target/quarkus-app/*
+# Per il pattern Dockerfile multi-stage (Maven dentro l'immagine).
+# Includiamo pom + src + maven wrapper, escludiamo build locali e IDE.
+target/
+.idea/
+*.iml
+*.iws
+*.ipr
+.mvn/wrapper/maven-wrapper.jar
+.classpath
+.project
+.settings/
+.flattened-pom.xml
+.git/
+.gitignore
+README.md

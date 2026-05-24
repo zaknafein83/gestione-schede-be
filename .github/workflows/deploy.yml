@@ -40,6 +40,16 @@ jobs:
           java-version: '25'
           cache: maven
 
+      # Le JWT dev keys NON sono in repo (vedi src/main/resources/jwt/README.md).
+      # Genero una coppia effimera per i test — i token firmati restano dentro
+      # il run, niente leak. In prod le chiavi vivono in /etc/dndsheets/jwt/.
+      - name: Generate ephemeral JWT keypair (test only)
+        run: |
+          mkdir -p src/main/resources/jwt
+          openssl genrsa -out src/main/resources/jwt/privateKey.pem 2048 2>/dev/null
+          openssl rsa -in src/main/resources/jwt/privateKey.pem \
+            -pubout -out src/main/resources/jwt/publicKey.pem 2>/dev/null
+
       # Punto Quarkus al service Mongo del runner. Settando questa env var,
       # Dev Services NON avvia il proprio container (vede già una URI).
       - name: Backend tests

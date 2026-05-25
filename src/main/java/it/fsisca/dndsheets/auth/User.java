@@ -38,6 +38,14 @@ public class User extends PanacheMongoEntity {
     public Instant updatedAt;
     public Instant deletedAt;       // soft delete; null = attivo
 
+    /**
+     * Timestamp di accettazione di Privacy Policy e Termini di Servizio al
+     * momento della registrazione (proof of consent ex art. 7(1) GDPR).
+     * Null per utenti pre-esistenti registrati prima dell'introduzione del
+     * checkbox; sara' richiesto a tutti i nuovi account.
+     */
+    public Instant privacyAcceptedAt;
+
     // ----- Monetizzazione / ruoli -----
 
     /** {@link #TIER_FREE} o {@link #TIER_PREMIUM}. Mai null sui nuovi utenti. */

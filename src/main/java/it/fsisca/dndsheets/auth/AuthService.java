@@ -57,13 +57,16 @@ public class AuthService {
         Instant now = Instant.now();
 
         User user = new User();
-        user.email         = email;
-        user.passwordHash  = passwordHasher.hash(req.password());
-        user.emailVerified = false;
-        user.username      = username;
-        user.displayName   = req.displayName().trim();
-        user.createdAt     = now;
-        user.updatedAt     = now;
+        user.email              = email;
+        user.passwordHash       = passwordHasher.hash(req.password());
+        user.emailVerified      = false;
+        user.username           = username;
+        user.displayName        = req.displayName().trim();
+        user.createdAt          = now;
+        user.updatedAt          = now;
+        // Proof of consent GDPR (art. 7(1)): la @AssertTrue su acceptPrivacy
+        // garantisce che siamo qui solo se l'utente ha spuntato il flag.
+        user.privacyAcceptedAt  = now;
         user.applyDefaults();  // tier=FREE, roles=[]
         user.persist();
 

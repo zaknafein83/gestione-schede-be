@@ -1,5 +1,6 @@
 package it.fsisca.dndsheets.auth.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -9,6 +10,11 @@ import jakarta.validation.constraints.Size;
  * Payload di {@code POST /auth/register}.
  * Le regole sulla password seguono la decisione di scope:
  * almeno 10 caratteri, almeno una maiuscola e almeno un numero.
+ *
+ * <p>{@code acceptPrivacy} e' la proof of consent GDPR (art. 7(1)): il
+ * frontend deve mostrare un checkbox esplicito linkato a Privacy Policy
+ * e ToS, e inviare {@code true} solo se l'utente ha realmente spuntato.
+ * Inviare {@code false} produce 400 PRIVACY_NOT_ACCEPTED.</p>
  */
 public record RegisterRequest(
         @NotBlank @Email @Size(max = 254) String email,
@@ -26,5 +32,8 @@ public record RegisterRequest(
         String username,
 
         @NotBlank @Size(max = 60)
-        String displayName
+        String displayName,
+
+        @AssertTrue(message = "Devi accettare la Privacy Policy e i Termini di Servizio per registrarti")
+        boolean acceptPrivacy
 ) {}

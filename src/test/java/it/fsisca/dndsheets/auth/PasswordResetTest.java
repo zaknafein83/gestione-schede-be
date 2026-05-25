@@ -89,7 +89,7 @@ class PasswordResetTest {
         // Registra ma NON verifica
         given().contentType(ContentType.JSON)
                 .body("""
-                      {"email":"frank@example.com","password":"Password123","username":"frank","displayName":"frank"}
+                      {"email":"frank@example.com","password":"Password123","username":"frank","displayName":"frank","acceptPrivacy":true}
                       """)
                 .when().post("/auth/register").then().statusCode(201);
         mailbox.clear(); // scarta la verifica email
@@ -259,7 +259,7 @@ class PasswordResetTest {
     private void registerAndVerify(String email, String username) {
         given().contentType(ContentType.JSON)
                 .body("""
-                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s"}
+                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s","acceptPrivacy":true}
                       """.formatted(email, username, username))
                 .when().post("/auth/register").then().statusCode(201);
 

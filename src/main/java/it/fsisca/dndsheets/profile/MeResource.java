@@ -38,6 +38,7 @@ public class MeResource {
     @Inject JsonWebToken   jwt;
     @Inject ProfileService profileService;
     @Inject AvatarService  avatarService;
+    @Inject ExportService  exportService;
 
     @GET
     public UserResponse get() {
@@ -66,6 +67,25 @@ public class MeResource {
     public Response deleteAccount(@Valid DeleteAccountRequest req) {
         profileService.deleteAccount(currentUser(), req.password());
         return Response.noContent().build();
+    }
+
+    /**
+     * Export dei dati personali (GDPR art. 15 + art. 20). Restituisce un
+     * JSON scaricabile con account, schede, dice rolls e share tokens.
+     * NON include avatar/portrait binari (scaricabili separatamente) né
+     * password hash o token di sessione.
+     */
+    @GET
+    @Path("/export")
+    public Response exportMyData() {
+        User user = currentUser();
+        var payload = exportService.buildExport(user);
+        String filename = "pg5e-export-" + user.id.toHexString() + "-"
+                + java.time.Instant.now().getEpochSecond() + ".json";
+        return Response.ok(payload)
+                .type(MediaType.APPLICATION_JSON)
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                .build();
     }
 
     // ---------------- Avatar ----------------

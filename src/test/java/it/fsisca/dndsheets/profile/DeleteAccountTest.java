@@ -109,7 +109,7 @@ class DeleteAccountTest {
         // L'email può essere ri-registrata (utente sparito davvero)
         given().contentType(ContentType.JSON)
                 .body("""
-                      {"email":"frank@example.com","password":"Password123","username":"new_frank","displayName":"New"}
+                      {"email":"frank@example.com","password":"Password123","username":"new_frank","displayName":"New","acceptPrivacy":true}
                       """)
                 .when().post("/auth/register")
                 .then().statusCode(201);
@@ -185,7 +185,7 @@ class DeleteAccountTest {
         // Poi registra+verifica frank2 per avere un account "vivo" da cancellare.
         given().contentType(ContentType.JSON)
                 .body("""
-                      {"email":"frank@example.com","password":"Password123","username":"frank","displayName":"frank"}
+                      {"email":"frank@example.com","password":"Password123","username":"frank","displayName":"frank","acceptPrivacy":true}
                       """)
                 .when().post("/auth/register").then().statusCode(201);
 
@@ -237,7 +237,7 @@ class DeleteAccountTest {
         // Stesso username, email diversa: deve passare
         given().contentType(ContentType.JSON)
                 .body("""
-                      {"email":"another@example.com","password":"Password123","username":"frank","displayName":"frank"}
+                      {"email":"another@example.com","password":"Password123","username":"frank","displayName":"frank","acceptPrivacy":true}
                       """)
                 .when().post("/auth/register").then().statusCode(201);
     }
@@ -288,7 +288,7 @@ class DeleteAccountTest {
     private String registerAndLogin(String email, String username) {
         given().contentType(ContentType.JSON)
                 .body("""
-                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s"}
+                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s","acceptPrivacy":true}
                       """.formatted(email, username, username))
                 .when().post("/auth/register").then().statusCode(201);
         String evt = extractVerifyToken(email);

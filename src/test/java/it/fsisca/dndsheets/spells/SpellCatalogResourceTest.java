@@ -172,7 +172,7 @@ class SpellCatalogResourceTest {
     private String registerAndLogin(String email, String username) {
         given().contentType(ContentType.JSON)
                 .body("""
-                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s"}
+                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s","acceptPrivacy":true}
                       """.formatted(email, username, username))
                 .when().post("/auth/register").then().statusCode(201);
         String evt = extractTokenFromMailboxFor(email);

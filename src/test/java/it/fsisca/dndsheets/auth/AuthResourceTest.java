@@ -162,6 +162,65 @@ class AuthResourceTest {
     }
 
     @Test
+    @DisplayName("register: acceptPrivacy=false → 400 (proof of consent GDPR)")
+    void registerWithoutPrivacyConsent() {
+        // Payload identico al valido, ma con acceptPrivacy=false
+        String body = """
+                {
+                  "email": "frank@example.com",
+                  "password": "Password123",
+                  "username": "frank",
+                  "displayName": "Frank S.",
+                  "acceptPrivacy": false
+                }
+                """;
+        given()
+                .contentType(ContentType.JSON)
+                .body(body)
+                .when().post("/auth/register")
+                .then()
+                .statusCode(400);
+    }
+
+    @Test
+    @DisplayName("register: acceptPrivacy omesso (default false) → 400")
+    void registerWithoutPrivacyField() {
+        // Senza il campo acceptPrivacy il primitive boolean assume default false
+        String body = """
+                {
+                  "email": "frank@example.com",
+                  "password": "Password123",
+                  "username": "frank",
+                  "displayName": "Frank S."
+                }
+                """;
+        given()
+                .contentType(ContentType.JSON)
+                .body(body)
+                .when().post("/auth/register")
+                .then()
+                .statusCode(400);
+    }
+
+    @Test
+    @DisplayName("register: acceptPrivacy=true salva privacyAcceptedAt sull'utente")
+    void registerSavesPrivacyTimestamp() {
+        given()
+                .contentType(ContentType.JSON)
+                .body(validPayload("frank@example.com", "frank", "Frank S.", "Password123"))
+                .when().post("/auth/register")
+                .then().statusCode(201);
+
+        // Verifica direttamente su Mongo che il timestamp sia stato persistito
+        Document u = mongoClient.getDatabase(dbName)
+                .getCollection("users")
+                .find(new Document("email", "frank@example.com"))
+                .first();
+        assertNotNull(u, "Utente trovato");
+        assertNotNull(u.get("privacyAcceptedAt"), "privacyAcceptedAt deve essere valorizzato");
+    }
+
+    @Test
     @DisplayName("register: password troppo corta → 400")
     void registerPasswordTooShort() {
         given()
@@ -267,7 +326,8 @@ class AuthResourceTest {
                   "email": "%s",
                   "password": "%s",
                   "username": "%s",
-                  "displayName": "%s"
+                  "displayName": "%s",
+                  "acceptPrivacy": true
                 }
                 """.formatted(email, password, username, displayName);
     }

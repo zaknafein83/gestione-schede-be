@@ -1,5 +1,6 @@
 package it.fsisca.dndsheets.auth;
 
+import it.fsisca.dndsheets.auth.dto.GoogleLoginRequest;
 import it.fsisca.dndsheets.auth.dto.LoginRequest;
 import it.fsisca.dndsheets.auth.dto.LoginResponse;
 import it.fsisca.dndsheets.auth.dto.RegisterRequest;
@@ -28,9 +29,10 @@ public class AuthService {
     private static final SecureRandom RNG = new SecureRandom();
     private static final int TOKEN_BYTES = 32;   // 32 byte -> 43 char base64url
 
-    @Inject PasswordHasher passwordHasher;
-    @Inject MailService    mailService;
-    @Inject JwtService     jwtService;
+    @Inject PasswordHasher       passwordHasher;
+    @Inject MailService          mailService;
+    @Inject JwtService           jwtService;
+    @Inject GoogleTokenVerifier  googleTokenVerifier;
 
     @ConfigProperty(name = "app.email-verification.token-duration")
     Duration tokenDuration;
@@ -263,6 +265,138 @@ public class AuthService {
                 .forEach(rt -> { rt.revokedAt = now; rt.update(); });
 
         LOG.infof("Password reset completato per %s", user.email);
+    }
+
+    /**
+     * Login/registrazione via Google ID token (OIDC).
+     *
+     * <p>Strategia di matching:</p>
+     * <ol>
+     *   <li><b>Match su googleSub</b>: utente che si e' gia' loggato con
+     *       Google in passato. Login diretto.</li>
+     *   <li><b>Match su email</b>: utente esistente registrato via
+     *       email+password. Auto-link silenzioso: salviamo {@code googleSub}
+     *       sull'utente e logghiamo. Sicuro perche' Google ha verificato l'email
+     *       (campo {@code email_verified=true} nel token), quindi non c'e'
+     *       rischio di account takeover. Se l'utente non aveva ancora
+     *       verificato la sua email, la marchiamo verificata adesso.</li>
+     *   <li><b>Nessun match</b>: registrazione di un nuovo utente. Richiede
+     *       {@code acceptPrivacy=true} (proof of consent GDPR). Username
+     *       auto-derivato dall'email con suffisso {@code _2,_3,...} su
+     *       collisione. {@code emailVerified=true} immediato (skip flusso
+     *       verifica email).</li>
+     * </ol>
+     */
+    public LoginResponse googleLogin(GoogleLoginRequest req) {
+        GoogleTokenVerifier.GoogleIdentity identity;
+        try {
+            identity = googleTokenVerifier.verify(req.idToken());
+        } catch (GoogleTokenVerifier.InvalidGoogleTokenException e) {
+            if ("NOT_CONFIGURED".equals(e.getMessage())) {
+                throw new AppException(jakarta.ws.rs.core.Response.Status.SERVICE_UNAVAILABLE,
+                        "GOOGLE_LOGIN_NOT_CONFIGURED",
+                        "Il login con Google non e' configurato su questo server");
+            }
+            LOG.infof("googleLogin: token rifiutato (%s)", e.getMessage());
+            throw AppException.unauthorized("INVALID_GOOGLE_TOKEN",
+                    "ID token Google non valido");
+        }
+
+        if (!identity.emailVerified()) {
+            // Account Google senza email verificata: rarissimo (workspace
+            // particolari) ma teoricamente possibile. Rifiutiamo per non
+            // assegnare account su email non controllata.
+            throw AppException.unauthorized("GOOGLE_EMAIL_NOT_VERIFIED",
+                    "L'email Google non risulta verificata");
+        }
+
+        String email = identity.email().toLowerCase();
+        Instant now = Instant.now();
+
+        // 1) Match per googleSub
+        Optional<User> bySub = User.findByGoogleSub(identity.sub());
+        if (bySub.isPresent()) {
+            return issueLoginResponse(bySub.get());
+        }
+
+        // 2) Auto-link per email
+        Optional<User> byEmail = User.findByEmail(email);
+        if (byEmail.isPresent()) {
+            User user = byEmail.get();
+            user.googleSub = identity.sub();
+            if (!user.emailVerified) {
+                user.emailVerified = true;
+            }
+            user.updatedAt = now;
+            user.update();
+            LOG.infof("googleLogin: auto-link Google a utente esistente %s", user.email);
+            return issueLoginResponse(user);
+        }
+
+        // 3) Nuova registrazione via Google. Acccept privacy obbligatorio.
+        if (!req.acceptPrivacy()) {
+            throw AppException.badRequest("PRIVACY_NOT_ACCEPTED",
+                    "Devi accettare la Privacy Policy e i Termini di Servizio per registrarti");
+        }
+
+        User user = new User();
+        user.email             = email;
+        user.passwordHash      = null;  // social-only
+        user.emailVerified     = true;  // Google ha gia' verificato
+        user.username          = deriveUniqueUsername(email);
+        user.displayName       = chooseDisplayName(identity, email);
+        user.googleSub         = identity.sub();
+        user.createdAt         = now;
+        user.updatedAt         = now;
+        user.privacyAcceptedAt = now;
+        user.applyDefaults();
+        user.persist();
+        LOG.infof("googleLogin: nuovo utente registrato via Google %s (username=%s)",
+                user.email, user.username);
+        return issueLoginResponse(user);
+    }
+
+    /** Emette access+refresh token per {@code user} e ritorna il payload login. */
+    private LoginResponse issueLoginResponse(User user) {
+        String accessToken  = jwtService.issueAccessToken(user);
+        String refreshPlain = issueRefreshToken(user);
+        return new LoginResponse(accessToken, refreshPlain, UserResponse.from(user));
+    }
+
+    /**
+     * Deriva uno username valido dall'email aggiungendo suffissi numerici se
+     * collide con uno esistente. Il backend impone {@code [a-zA-Z0-9_]{3,30}},
+     * quindi sanitizziamo i caratteri non ammessi (es. punti → underscore).
+     */
+    String deriveUniqueUsername(String email) {
+        String local = email.contains("@") ? email.substring(0, email.indexOf('@')) : email;
+        String base = local.replaceAll("[^a-zA-Z0-9_]", "_");
+        if (base.length() < 3) base = base + "_user";
+        if (base.length() > 27) base = base.substring(0, 27);
+
+        if (!User.existsByUsername(base)) return base;
+        for (int i = 2; i < 1000; i++) {
+            String suffix = "_" + i;
+            String candidate = (base.length() + suffix.length() > 30)
+                    ? base.substring(0, 30 - suffix.length()) + suffix
+                    : base + suffix;
+            if (!User.existsByUsername(candidate)) return candidate;
+        }
+        // Bound paranoico: 998 collisioni sulla stessa base sono praticamente
+        // impossibili; se accade qualcosa di strano fallback a base + epoch.
+        return (base.length() > 18 ? base.substring(0, 18) : base) + "_" + now().toEpochMilli();
+    }
+
+    /** Hook estraibile per i test. */
+    Instant now() {
+        return Instant.now();
+    }
+
+    private static String chooseDisplayName(GoogleTokenVerifier.GoogleIdentity id, String emailFallback) {
+        if (id.name() != null && !id.name().isBlank()) return id.name().trim();
+        // Fallback all'local-part dell'email se Google non ha fornito name.
+        int at = emailFallback.indexOf('@');
+        return at > 0 ? emailFallback.substring(0, at) : emailFallback;
     }
 
     /** Genera un refresh token, ne persiste l'hash e ritorna il valore in chiaro. */

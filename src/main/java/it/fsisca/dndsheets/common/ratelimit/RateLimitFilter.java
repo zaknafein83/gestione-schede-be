@@ -59,6 +59,7 @@ public class RateLimitFilter implements ContainerRequestFilter {
         String key;
         switch (path) {
             case "auth/login":
+            case "auth/google":
                 max = loginMaxPerMinute;
                 key = "login:" + clientIp();
                 break;

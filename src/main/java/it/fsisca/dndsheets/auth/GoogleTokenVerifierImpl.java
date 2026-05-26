@@ -68,7 +68,10 @@ public class GoogleTokenVerifierImpl implements GoogleTokenVerifier {
         GoogleIdToken token;
         try {
             token = verifier.verify(idToken);
-        } catch (GeneralSecurityException | IOException e) {
+        } catch (GeneralSecurityException | IOException | IllegalArgumentException e) {
+            // IllegalArgumentException: la libreria la lancia se il parametro non
+            // ha forma di JWT (es. stringa arbitraria senza i 3 segmenti base64
+            // separati da '.'). Senza questo catch finirebbe come 500.
             throw new InvalidGoogleTokenException("Errore nella verifica del token Google", e);
         }
         if (token == null) {

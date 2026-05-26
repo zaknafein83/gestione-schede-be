@@ -15,6 +15,7 @@ public class LayoutWidget {
             "ANAGRAFICA",
             "STATS",
             "ABILITIES",
+            "SAVES",
             "COMBAT",
             "CONDITIONS",
             "SPELLCASTING",

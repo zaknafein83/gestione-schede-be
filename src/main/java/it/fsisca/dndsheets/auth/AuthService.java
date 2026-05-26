@@ -18,6 +18,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Optional;
 
 /**
  * Logica applicativa della feature auth (F1): registrazione e verifica email.

@@ -33,23 +33,31 @@ public class GoogleTokenVerifierImpl implements GoogleTokenVerifier {
 
     private static final Logger LOG = Logger.getLogger(GoogleTokenVerifierImpl.class);
 
-    @ConfigProperty(name = "app.google.client-id", defaultValue = "")
-    String clientId;
+    /**
+     * Optional perche' SmallRye Config in Quarkus 3.x rifiuta di iniettare
+     * una String quando l'env var risolve a "" (es. {@code GOOGLE_CLIENT_ID_WEB}
+     * non impostata in prod): il startup fallisce con "Failed to load config
+     * value of type class java.lang.String". Con Optional&lt;String&gt; il valore
+     * mancante e' un Optional.empty() lecito.
+     */
+    @ConfigProperty(name = "app.google.client-id")
+    Optional<String> clientIdConfig;
 
     private GoogleIdTokenVerifier verifier;
 
     @PostConstruct
     void init() {
-        if (clientId == null || clientId.isBlank()) {
+        final String id = clientIdConfig.orElse("").trim();
+        if (id.isEmpty()) {
             LOG.info("app.google.client-id non configurata: POST /auth/google rispondera' 503.");
             return;
         }
         this.verifier = new GoogleIdTokenVerifier.Builder(
                 new NetHttpTransport(),
                 GsonFactory.getDefaultInstance())
-                .setAudience(Collections.singletonList(clientId))
+                .setAudience(Collections.singletonList(id))
                 .build();
-        LOG.infof("GoogleTokenVerifier inizializzato per audience %s", maskClientId(clientId));
+        LOG.infof("GoogleTokenVerifier inizializzato per audience %s", maskClientId(id));
     }
 
     @Override

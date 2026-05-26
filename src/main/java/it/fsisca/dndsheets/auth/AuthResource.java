@@ -1,6 +1,7 @@
 package it.fsisca.dndsheets.auth;
 
 import it.fsisca.dndsheets.auth.dto.ForgotPasswordRequest;
+import it.fsisca.dndsheets.auth.dto.GoogleLoginRequest;
 import it.fsisca.dndsheets.auth.dto.LoginRequest;
 import it.fsisca.dndsheets.auth.dto.LoginResponse;
 import it.fsisca.dndsheets.auth.dto.RefreshRequest;
@@ -45,6 +46,18 @@ public class AuthResource {
     @Path("/login")
     public LoginResponse login(@Valid LoginRequest req) {
         return authService.login(req);
+    }
+
+    /**
+     * Login/registrazione via Google OIDC. Riceve l'ID token ottenuto dal
+     * client tramite Google Sign-In, lo verifica e ritorna la stessa
+     * {@link LoginResponse} di {@link #login}. Vedi {@link AuthService#googleLogin}
+     * per la strategia di matching/auto-link.
+     */
+    @POST
+    @Path("/google")
+    public LoginResponse googleLogin(@Valid GoogleLoginRequest req) {
+        return authService.googleLogin(req);
     }
 
     @POST

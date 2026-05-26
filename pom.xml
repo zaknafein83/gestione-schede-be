@@ -89,6 +89,23 @@
             <version>1.8.4</version>
         </dependency>
 
+        <!-- Verifica ID token Google per il login OAuth (POST /auth/google).
+             GoogleIdTokenVerifier scarica e cachea i certificati Google, valida
+             firma, audience, issuer, exp. Versione allineata a quella usata da
+             quarkus-mailer (httpclient compatibile). -->
+        <dependency>
+            <groupId>com.google.api-client</groupId>
+            <artifactId>google-api-client</artifactId>
+            <version>2.7.0</version>
+            <exclusions>
+                <!-- Esclude commons-logging che entra in conflitto col logging Quarkus. -->
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit</artifactId>

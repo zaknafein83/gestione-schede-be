@@ -27,12 +27,23 @@ public class User extends PanacheMongoEntity {
     public static final String ROLE_ADMIN = "ADMIN";
 
     public String email;
-    public String passwordHash;     // hash Argon2id
+    /**
+     * Hash Argon2id della password. Null per utenti registrati via Google
+     * (OAuth-only) che non hanno mai impostato una password.
+     */
+    public String passwordHash;
     public boolean emailVerified;
     public String username;
     public String displayName;
     public String bio;
     public org.bson.types.ObjectId avatarFileId;   // riferimento GridFS, null se non c'e'
+
+    /**
+     * "sub" del token OIDC Google (identificatore stabile dell'account Google,
+     * indipendente dalla email). Univoco fra gli utenti. Null per utenti che
+     * non hanno mai fatto login con Google.
+     */
+    public String googleSub;
 
     public Instant createdAt;
     public Instant updatedAt;
@@ -79,6 +90,10 @@ public class User extends PanacheMongoEntity {
 
     public static Optional<User> findByUsername(String username) {
         return Optional.ofNullable(find("username", username).firstResult());
+    }
+
+    public static Optional<User> findByGoogleSub(String googleSub) {
+        return Optional.ofNullable(find("googleSub", googleSub).firstResult());
     }
 
     public static boolean existsByEmail(String email) {

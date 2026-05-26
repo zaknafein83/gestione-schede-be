@@ -25,9 +25,40 @@ public class CharacterLayoutService {
     /** Ritorna il layout custom o {@link Optional#empty()} se nessuno. */
     public Optional<CharacterLayout> findFor(User owner, String characterId) {
         Character c = characterService.get(owner, characterId);
-        return CharacterLayout
+        Optional<CharacterLayout> opt = CharacterLayout
                 .<CharacterLayout>find("ownerId = ?1 and characterId = ?2", owner.id, c.id)
                 .firstResultOptional();
+        opt.ifPresent(this::migrateInjectSavesIfNeeded);
+        return opt;
+    }
+
+    /**
+     * Migrazione one-shot per lo split del widget "Abilità" in "Abilità" (solo
+     * skill) + "Tiri salvezza" (solo TS). Se il layout salvato ha un widget
+     * ABILITIES ma nessun SAVES, aggiungiamo SAVES e persistiamo cosi' la
+     * prossima volta la condizione non scatta piu' e le modifiche dell'utente
+     * (es. rimuovere SAVES volontariamente) sono preservate.
+     *
+     * <p>Posizionamento: x=0, y=0, default 16x12, z = maxZ+1 — finisce in alto a
+     * sinistra sopra gli altri widget; l'utente lo riposiziona dall'editor.</p>
+     */
+    private void migrateInjectSavesIfNeeded(CharacterLayout l) {
+        if (l.widgets == null || l.widgets.isEmpty()) return;
+        boolean hasAbilities = l.widgets.stream().anyMatch(w -> "ABILITIES".equals(w.type));
+        boolean hasSaves     = l.widgets.stream().anyMatch(w -> "SAVES".equals(w.type));
+        if (!hasAbilities || hasSaves) return;
+
+        int maxZ = l.widgets.stream().mapToInt(w -> w.z).max().orElse(0);
+        LayoutWidget saves = new LayoutWidget();
+        saves.type = "SAVES";
+        saves.x = 0;
+        saves.y = 0;
+        saves.w = 16;
+        saves.h = 12;
+        saves.z = maxZ + 1;
+        l.widgets.add(saves);
+        l.updatedAt = Instant.now();
+        l.update();
     }
 
     /**

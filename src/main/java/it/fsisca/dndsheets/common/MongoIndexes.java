@@ -78,6 +78,13 @@ public class MongoIndexes {
                 Indexes.ascending("ownerId"),
                 new IndexOptions().name("idx_chars_ownerid"));
 
+        // Character layouts (1 per character)
+        db.getCollection("character_layouts").createIndex(
+                Indexes.compoundIndex(
+                        Indexes.ascending("ownerId"),
+                        Indexes.ascending("characterId")),
+                new IndexOptions().unique(true).name("uniq_layouts_owner_char"));
+
         // Share tokens
         db.getCollection("share_tokens").createIndex(
                 Indexes.ascending("tokenHash"),

@@ -81,6 +81,8 @@ public class CharacterService {
     public void delete(User owner, String id) {
         Character c = get(owner, id);
         ObjectId portrait = c.portraitFileId;
+        // Cascade: cancella layout custom della scheda (se presente).
+        CharacterLayout.delete("characterId", c.id);
         c.delete();
         portraitService.deleteFileOnly(portrait);  // no-op se null
     }

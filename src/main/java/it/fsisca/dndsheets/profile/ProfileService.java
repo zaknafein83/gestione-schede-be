@@ -147,6 +147,11 @@ public class ProfileService {
                 .deleteMany(Filters.eq("ownerId", userId))
                 .getDeletedCount();
 
+        // 5b. Character layouts (dashboard premium)
+        long layoutsDeleted = db.getCollection("character_layouts")
+                .deleteMany(Filters.eq("ownerId", userId))
+                .getDeletedCount();
+
         // 6. Avatar GridFS
         avatarService.delete(user);
 
@@ -168,9 +173,9 @@ public class ProfileService {
         // 10. User
         user.delete();
 
-        LOG.infof("Account cancellato: %s — characters=%d, portraits=%d, shares=%d, "
+        LOG.infof("Account cancellato: %s — characters=%d, layouts=%d, portraits=%d, shares=%d, "
                         + "rolls=%d, refresh=%d, evt=%d, prt=%d",
-                email, charsDeleted, portraitFiles.size(), sharesDeleted,
+                email, charsDeleted, layoutsDeleted, portraitFiles.size(), sharesDeleted,
                 rollsDeleted, refreshDeleted, evDeleted, prtDeleted);
     }
 }

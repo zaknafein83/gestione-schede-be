@@ -42,6 +42,13 @@
 
 set -euo pipefail
 
+# Spostiamoci in una dir world-readable: se lo script viene lanciato come
+# `sudo -u deploy` da una shell con cwd non leggibile da deploy (es. la home
+# di ubuntu in mode 700), `find` esplode nel cleanup con "Failed to restore
+# initial working directory: ... Permission denied" e `set -e` interrompe
+# l'upload off-site. Per il cron questo non succede mai (parte da $HOME deploy).
+cd /tmp
+
 LOCK=/tmp/backup-mongo.lock
 exec 200>"$LOCK"
 flock -n 200 || { echo "backup-mongo già in esecuzione"; exit 0; }

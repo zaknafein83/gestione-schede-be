@@ -150,6 +150,12 @@ public class StripeService {
         } catch (SignatureVerificationException e) {
             LOG.warnf("Webhook Stripe: firma non valida (%s)", e.getMessage());
             throw AppException.badRequest("INVALID_SIGNATURE", "Firma webhook non valida");
+        } catch (RuntimeException e) {
+            // Stripe SDK parsa il JSON prima della verifica firma: payload
+            // non-JSON o payload con shape inattesa lanciano JsonSyntaxException
+            // (sottoclasse di RuntimeException), non catturata da SignatureVerificationException.
+            LOG.warnf("Webhook Stripe: payload non valido (%s)", e.getMessage());
+            throw AppException.badRequest("INVALID_PAYLOAD", "Payload webhook non valido");
         }
 
         // Idempotency: se l'event.id e' gia' in DB, no-op.

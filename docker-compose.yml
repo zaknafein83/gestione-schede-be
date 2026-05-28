@@ -60,11 +60,14 @@ services:
       # Google OAuth Web Client ID per POST /auth/google (vuoto -> endpoint 503).
       GOOGLE_CLIENT_ID_WEB: ${GOOGLE_CLIENT_ID_WEB:-}
       # Stripe Premium pagamenti (vuoto -> /me/stripe/* + /stripe/webhook 503).
+      # NB: STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL NON sono dichiarate qui:
+      # cosi' restano "unset" lato container e Quarkus applica il default
+      # da application.properties (basato su APP_BASE_URL). Se le mettiamo
+      # con `${VAR:-}` arrivano come stringhe vuote e il default NON scatta
+      # (Quarkus interpreta "" come valore valido), rompendo isConfigured().
       STRIPE_SECRET_KEY:     ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_ID:       ${STRIPE_PRICE_ID:-}
-      STRIPE_SUCCESS_URL:    ${STRIPE_SUCCESS_URL:-}
-      STRIPE_CANCEL_URL:     ${STRIPE_CANCEL_URL:-}
     volumes:
       # Generate una volta sull'host (vedi README), chmod 600 owner deploy:
       #   openssl genrsa -out privateKey.pem 2048

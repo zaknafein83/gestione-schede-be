@@ -16,8 +16,14 @@ import jakarta.validation.constraints.NotBlank;
  * {@code 400 PRIVACY_NOT_ACCEPTED} altrimenti. Per i login successivi il campo
  * viene ignorato. Non usiamo {@code @AssertTrue} perche' deve poter essere
  * {@code false} per gli accessi successivi al primo.</p>
+ *
+ * <p>{@code declareMinAge} e' l'autocertificazione di eta' minima (14 anni)
+ * con la stessa semantica di {@code acceptPrivacy}: richiesta solo al primo
+ * accesso, ignorata sui successivi. Non {@code @AssertTrue} per lo stesso
+ * motivo. Il service rifiuta con {@code 400 AGE_NOT_DECLARED}.</p>
  */
 public record GoogleLoginRequest(
         @NotBlank String idToken,
-        boolean acceptPrivacy
+        boolean acceptPrivacy,
+        boolean declareMinAge
 ) {}

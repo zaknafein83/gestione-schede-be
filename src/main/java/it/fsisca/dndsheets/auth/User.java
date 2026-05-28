@@ -57,6 +57,14 @@ public class User extends PanacheMongoEntity {
      */
     public Instant privacyAcceptedAt;
 
+    /**
+     * Timestamp dell'autocertificazione "ho almeno 14 anni" prestata al momento
+     * della registrazione. Soglia ex art. 8 GDPR + art. 2-quinquies D.Lgs
+     * 101/2018 (Italia). Null per utenti pre-esistenti registrati prima
+     * dell'introduzione del checkbox; sara' richiesto a tutti i nuovi account.
+     */
+    public Instant ageDeclaredAt;
+
     // ----- Monetizzazione / ruoli -----
 
     /** {@link #TIER_FREE} o {@link #TIER_PREMIUM}. Mai null sui nuovi utenti. */

@@ -76,6 +76,7 @@ class ExportTest {
                 .body("account.emailVerified",    is(true))
                 .body("account.hasAvatar",        is(false))
                 .body("account.privacyAcceptedAt", notNullValue())
+                .body("account.ageDeclaredAt",    notNullValue())
                 .body("$",                        not(hasKey("passwordHash")))
                 .body("account",                  not(hasKey("passwordHash")))
                 .body("characters",               hasSize(0))
@@ -127,7 +128,7 @@ class ExportTest {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s","acceptPrivacy":true}
+                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s","acceptPrivacy":true,"declareMinAge":true}
                       """.formatted(email, username, username))
                 .when().post("/auth/register")
                 .then().statusCode(201);

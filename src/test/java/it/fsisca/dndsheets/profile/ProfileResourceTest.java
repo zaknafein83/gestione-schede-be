@@ -257,7 +257,7 @@ class ProfileResourceTest {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"email":"%s","password":"Password123","username":"%s","displayName":"Frank S.","acceptPrivacy":true}
+                      {"email":"%s","password":"Password123","username":"%s","displayName":"Frank S.","acceptPrivacy":true,"declareMinAge":true}
                       """.formatted(email, username))
                 .when().post("/auth/register")
                 .then().statusCode(201);

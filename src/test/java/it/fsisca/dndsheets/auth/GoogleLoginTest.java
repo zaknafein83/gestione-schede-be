@@ -71,7 +71,7 @@ class GoogleLoginTest {
         String accessToken = given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"idToken":"fake-token","acceptPrivacy":true}
+                      {"idToken":"fake-token","acceptPrivacy":true,"declareMinAge":true}
                       """)
                 .when().post("/auth/google")
                 .then()
@@ -93,6 +93,7 @@ class GoogleLoginTest {
         assertNull(u.getString("passwordHash"));
         assertTrue(u.getBoolean("emailVerified"));
         assertNotNull(u.getDate("privacyAcceptedAt"));
+        assertNotNull(u.getDate("ageDeclaredAt"));
     }
 
     @Test
@@ -104,7 +105,7 @@ class GoogleLoginTest {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"idToken":"x","acceptPrivacy":true}
+                      {"idToken":"x","acceptPrivacy":true,"declareMinAge":true}
                       """)
                 .when().post("/auth/google")
                 .then()
@@ -124,7 +125,7 @@ class GoogleLoginTest {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"idToken":"x","acceptPrivacy":true}
+                      {"idToken":"x","acceptPrivacy":true,"declareMinAge":true}
                       """)
                 .when().post("/auth/google")
                 .then()
@@ -151,6 +152,27 @@ class GoogleLoginTest {
         // L'utente NON deve essere stato creato
         long count = mongoClient.getDatabase(dbName).getCollection("users")
                 .countDocuments(new Document("email", "nuovo@example.com"));
+        assertEquals(0L, count);
+    }
+
+    @Test
+    @DisplayName("nuovo utente: declareMinAge=false → 400 AGE_NOT_DECLARED")
+    void newUserMissingAgeDeclaration() {
+        FakeGoogleTokenVerifier.setNext(new GoogleTokenVerifier.GoogleIdentity(
+                "google-sub-y", "minorenne@example.com", true, "Tizio", null));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                      {"idToken":"x","acceptPrivacy":true,"declareMinAge":false}
+                      """)
+                .when().post("/auth/google")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("AGE_NOT_DECLARED"));
+
+        long count = mongoClient.getDatabase(dbName).getCollection("users")
+                .countDocuments(new Document("email", "minorenne@example.com"));
         assertEquals(0L, count);
     }
 
@@ -267,7 +289,7 @@ class GoogleLoginTest {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"idToken":"bogus","acceptPrivacy":true}
+                      {"idToken":"bogus","acceptPrivacy":true,"declareMinAge":true}
                       """)
                 .when().post("/auth/google")
                 .then()
@@ -284,7 +306,7 @@ class GoogleLoginTest {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"idToken":"x","acceptPrivacy":true}
+                      {"idToken":"x","acceptPrivacy":true,"declareMinAge":true}
                       """)
                 .when().post("/auth/google")
                 .then()
@@ -298,7 +320,7 @@ class GoogleLoginTest {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"acceptPrivacy":true}
+                      {"acceptPrivacy":true,"declareMinAge":true}
                       """)
                 .when().post("/auth/google")
                 .then()

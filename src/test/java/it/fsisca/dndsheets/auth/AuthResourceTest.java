@@ -203,7 +203,49 @@ class AuthResourceTest {
     }
 
     @Test
-    @DisplayName("register: acceptPrivacy=true salva privacyAcceptedAt sull'utente")
+    @DisplayName("register: declareMinAge=false → 400 (autocertificazione eta' art. 8 GDPR)")
+    void registerWithoutAgeDeclaration() {
+        String body = """
+                {
+                  "email": "frank@example.com",
+                  "password": "Password123",
+                  "username": "frank",
+                  "displayName": "Frank S.",
+                  "acceptPrivacy": true,
+                  "declareMinAge": false
+                }
+                """;
+        given()
+                .contentType(ContentType.JSON)
+                .body(body)
+                .when().post("/auth/register")
+                .then()
+                .statusCode(400);
+    }
+
+    @Test
+    @DisplayName("register: declareMinAge omesso (default false) → 400")
+    void registerWithoutAgeField() {
+        // Senza il campo declareMinAge il primitive boolean assume default false
+        String body = """
+                {
+                  "email": "frank@example.com",
+                  "password": "Password123",
+                  "username": "frank",
+                  "displayName": "Frank S.",
+                  "acceptPrivacy": true
+                }
+                """;
+        given()
+                .contentType(ContentType.JSON)
+                .body(body)
+                .when().post("/auth/register")
+                .then()
+                .statusCode(400);
+    }
+
+    @Test
+    @DisplayName("register: payload valido salva privacyAcceptedAt + ageDeclaredAt")
     void registerSavesPrivacyTimestamp() {
         given()
                 .contentType(ContentType.JSON)
@@ -211,13 +253,14 @@ class AuthResourceTest {
                 .when().post("/auth/register")
                 .then().statusCode(201);
 
-        // Verifica direttamente su Mongo che il timestamp sia stato persistito
+        // Verifica direttamente su Mongo che entrambi i timestamp siano persistiti
         Document u = mongoClient.getDatabase(dbName)
                 .getCollection("users")
                 .find(new Document("email", "frank@example.com"))
                 .first();
         assertNotNull(u, "Utente trovato");
         assertNotNull(u.get("privacyAcceptedAt"), "privacyAcceptedAt deve essere valorizzato");
+        assertNotNull(u.get("ageDeclaredAt"),     "ageDeclaredAt deve essere valorizzato");
     }
 
     @Test
@@ -327,8 +370,9 @@ class AuthResourceTest {
                   "password": "%s",
                   "username": "%s",
                   "displayName": "%s",
-                  "acceptPrivacy": true
-                }
+                  "acceptPrivacy": true,
+                  "declareMinAge": true
+}
                 """.formatted(email, password, username, displayName);
     }
 

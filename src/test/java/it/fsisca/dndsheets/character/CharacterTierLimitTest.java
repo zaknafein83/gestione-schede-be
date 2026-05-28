@@ -28,7 +28,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 /**
- * Verifica il limite scheda per il tier FREE. Riporta il limite a 2 (sotto il
+ * Verifica il limite scheda per il tier FREE. Riporta il limite a 1 (sotto il
  * default %test=999) tramite TestProfile, così i test storici non si rompono.
  */
 @QuarkusTest
@@ -39,7 +39,7 @@ class CharacterTierLimitTest {
     public static class LowLimitProfile implements QuarkusTestProfile {
         @Override
         public Map<String, String> getConfigOverrides() {
-            return Map.of("app.free-tier.max-characters", "2");
+            return Map.of("app.free-tier.max-characters", "1");
         }
     }
 
@@ -70,28 +70,27 @@ class CharacterTierLimitTest {
     // ==================================================================
 
     @Test
-    @DisplayName("Utente FREE: 2 schede ok, alla 3a → 402 + TIER_LIMIT_REACHED")
-    void freeUserHitsLimitOnThirdCreate() {
+    @DisplayName("Utente FREE: 1 scheda ok, alla 2a → 402 + TIER_LIMIT_REACHED")
+    void freeUserHitsLimitOnSecondCreate() {
         String access = registerAndLogin("frank@example.com", "frank");
 
         createCharacter(access, "{\"name\":\"PG 1\"}");
-        createCharacter(access, "{\"name\":\"PG 2\"}");
 
         given()
                 .header("Authorization", "Bearer " + access)
                 .contentType(ContentType.JSON)
-                .body("{\"name\":\"PG 3\"}")
+                .body("{\"name\":\"PG 2\"}")
                 .when().post("/characters")
                 .then()
                 .statusCode(402)
                 .body("code",   equalTo("TIER_LIMIT_REACHED"))
                 .body("status", is(402));
 
-        // La lista resta a 2
+        // La lista resta a 1
         given()
                 .header("Authorization", "Bearer " + access)
                 .when().get("/characters")
-                .then().statusCode(200).body("$", org.hamcrest.Matchers.hasSize(2));
+                .then().statusCode(200).body("$", org.hamcrest.Matchers.hasSize(1));
     }
 
     @Test
@@ -100,7 +99,6 @@ class CharacterTierLimitTest {
         String access = registerAndLogin("frank@example.com", "frank");
 
         String idA = createCharacter(access, "{\"name\":\"PG A\"}");
-        createCharacter(access, "{\"name\":\"PG B\"}");
 
         given()
                 .header("Authorization", "Bearer " + access)
@@ -109,11 +107,11 @@ class CharacterTierLimitTest {
                 .statusCode(402)
                 .body("code", equalTo("TIER_LIMIT_REACHED"));
 
-        // Originale ancora presente, lista = 2
+        // Originale ancora presente, lista = 1
         given()
                 .header("Authorization", "Bearer " + access)
                 .when().get("/characters")
-                .then().statusCode(200).body("$", org.hamcrest.Matchers.hasSize(2));
+                .then().statusCode(200).body("$", org.hamcrest.Matchers.hasSize(1));
     }
 
     @Test
@@ -123,17 +121,15 @@ class CharacterTierLimitTest {
         String accessB = registerAndLogin("b@example.com", "userB");
 
         createCharacter(accessA, "{\"name\":\"A1\"}");
-        createCharacter(accessA, "{\"name\":\"A2\"}");
 
-        // B puo' ancora creare
+        // B puo' ancora creare la sua prima scheda
         createCharacter(accessB, "{\"name\":\"B1\"}");
-        createCharacter(accessB, "{\"name\":\"B2\"}");
 
-        // A no
+        // A no, ha gia' raggiunto il limite
         given()
                 .header("Authorization", "Bearer " + accessA)
                 .contentType(ContentType.JSON)
-                .body("{\"name\":\"A3\"}")
+                .body("{\"name\":\"A2\"}")
                 .when().post("/characters")
                 .then().statusCode(402);
     }
@@ -143,7 +139,7 @@ class CharacterTierLimitTest {
     // ==================================================================
 
     @Test
-    @DisplayName("Utente PREMIUM: nessun limite, puo' creare oltre 2 schede")
+    @DisplayName("Utente PREMIUM: nessun limite, puo' creare molte schede")
     void premiumUserNoLimit() {
         String access = registerAndLogin("frank@example.com", "frank");
         promoteToPremium("frank@example.com");

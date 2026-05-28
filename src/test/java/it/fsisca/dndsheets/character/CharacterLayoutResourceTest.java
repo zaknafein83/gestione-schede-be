@@ -1,8 +1,6 @@
 package it.fsisca.dndsheets.character;
 
 import com.mongodb.client.MongoClient;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
 import io.quarkus.mailer.MockMailbox;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.RestAssured;
@@ -22,7 +20,6 @@ import java.util.regex.Pattern;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
@@ -32,8 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Test feature dashboard custom — endpoint
  * GET/PUT/DELETE {@code /characters/{id}/layout}.
- * Coperture: default layout, ownership, premium gate, validation,
- * cascade su delete scheda.
+ * Coperture: default layout, ownership, validation, cascade su delete scheda.
+ * Il layout dinamico è incluso nel piano gratuito sulla 1ª scheda; il paywall
+ * scatta solo sulla creazione di schede ulteriori (coperto da
+ * {@link CharacterTierLimitTest}).
  */
 @QuarkusTest
 @DisplayName("Dashboard custom — layout endpoint")
@@ -98,42 +97,13 @@ class CharacterLayoutResourceTest {
     }
 
     // ==================================================================
-    //                          PUT — premium gate
+    //                              PUT — save
     // ==================================================================
 
     @Test
-    @DisplayName("PUT layout: utente FREE → 402 TIER_LIMIT_REACHED")
-    void freeUserCannotSaveLayout() {
+    @DisplayName("PUT layout: utente FREE → 200 (layout incluso nel piano gratuito)")
+    void userCanSaveLayout() {
         String access = registerAndLogin("frank@example.com", "frank");
-        String id = createCharacter(access, "{\"name\":\"Mirko\"}");
-
-        given()
-                .header("Authorization", "Bearer " + access)
-                .contentType(ContentType.JSON)
-                .body("""
-                      {"widgets":[
-                        {"type":"STATS","x":0,"y":0,"w":4,"h":4,"z":0}
-                      ]}
-                      """)
-                .when().put("/characters/" + id + "/layout")
-                .then()
-                .statusCode(402)
-                .body("code", equalTo("TIER_LIMIT_REACHED"));
-
-        // GET non deve trovare nulla — il salvataggio non è avvenuto
-        given()
-                .header("Authorization", "Bearer " + access)
-                .when().get("/characters/" + id + "/layout")
-                .then()
-                .statusCode(200)
-                .body("isDefault", is(true));
-    }
-
-    @Test
-    @DisplayName("PUT layout: utente PREMIUM → 200 + layout salvato")
-    void premiumUserCanSaveLayout() {
-        String access = registerAndLogin("frank@example.com", "frank");
-        promoteToPremium("frank@example.com");
         String id = createCharacter(access, "{\"name\":\"Mirko\"}");
 
         given()
@@ -169,7 +139,6 @@ class CharacterLayoutResourceTest {
     @DisplayName("PUT layout: secondo save sovrascrive il primo (no record duplicati)")
     void putLayoutOverwritesExisting() {
         String access = registerAndLogin("frank@example.com", "frank");
-        promoteToPremium("frank@example.com");
         String id = createCharacter(access, "{\"name\":\"Mirko\"}");
 
         given()
@@ -208,7 +177,6 @@ class CharacterLayoutResourceTest {
     @DisplayName("PUT layout: tipo widget sconosciuto → 400 INVALID_WIDGET_TYPE")
     void putLayoutInvalidType() {
         String access = registerAndLogin("frank@example.com", "frank");
-        promoteToPremium("frank@example.com");
         String id = createCharacter(access, "{\"name\":\"Mirko\"}");
 
         given()
@@ -229,7 +197,6 @@ class CharacterLayoutResourceTest {
     @DisplayName("PUT layout: due widget dello stesso tipo → 400 DUPLICATE_WIDGET_TYPE")
     void putLayoutDuplicateType() {
         String access = registerAndLogin("frank@example.com", "frank");
-        promoteToPremium("frank@example.com");
         String id = createCharacter(access, "{\"name\":\"Mirko\"}");
 
         given()
@@ -251,7 +218,6 @@ class CharacterLayoutResourceTest {
     @DisplayName("PUT layout: coordinate negative → 400 VALIDATION_FAILED")
     void putLayoutNegativeCoordinatesValidationFails() {
         String access = registerAndLogin("frank@example.com", "frank");
-        promoteToPremium("frank@example.com");
         String id = createCharacter(access, "{\"name\":\"Mirko\"}");
 
         given()
@@ -276,7 +242,6 @@ class CharacterLayoutResourceTest {
     @DisplayName("DELETE layout: rimuove e GET torna a isDefault")
     void deleteLayoutResetsToDefault() {
         String access = registerAndLogin("frank@example.com", "frank");
-        promoteToPremium("frank@example.com");
         String id = createCharacter(access, "{\"name\":\"Mirko\"}");
 
         // Salva un layout
@@ -287,7 +252,7 @@ class CharacterLayoutResourceTest {
                 .when().put("/characters/" + id + "/layout")
                 .then().statusCode(200);
 
-        // Delete (anche se FREE può chiamare delete: è solo reset)
+        // Delete è sempre permesso
         given()
                 .header("Authorization", "Bearer " + access)
                 .when().delete("/characters/" + id + "/layout")
@@ -310,7 +275,6 @@ class CharacterLayoutResourceTest {
     @DisplayName("DELETE scheda: il layout della scheda viene cancellato (cascade)")
     void deleteCharacterCascadesLayout() {
         String access = registerAndLogin("frank@example.com", "frank");
-        promoteToPremium("frank@example.com");
         String id = createCharacter(access, "{\"name\":\"Mirko\"}");
 
         given()
@@ -336,62 +300,9 @@ class CharacterLayoutResourceTest {
                 "Atteso: layout cancellato in cascade quando si cancella la scheda");
     }
 
-    @Test
-    @DisplayName("Utente PREMIUM declassato a FREE: GET ritorna comunque il layout salvato")
-    void downgradedUserStillSeesPreviouslySavedLayout() {
-        String access = registerAndLogin("frank@example.com", "frank");
-        promoteToPremium("frank@example.com");
-        String id = createCharacter(access, "{\"name\":\"Mirko\"}");
-
-        given()
-                .header("Authorization", "Bearer " + access)
-                .contentType(ContentType.JSON)
-                .body("{\"widgets\":[{\"type\":\"STATS\",\"x\":0,\"y\":0,\"w\":2,\"h\":2,\"z\":0}]}")
-                .when().put("/characters/" + id + "/layout")
-                .then().statusCode(200);
-
-        // Declassa
-        demoteToFree("frank@example.com");
-
-        // GET continua a funzionare
-        given()
-                .header("Authorization", "Bearer " + access)
-                .when().get("/characters/" + id + "/layout")
-                .then()
-                .statusCode(200)
-                .body("isDefault", is(false))
-                .body("widgets",   hasSize(greaterThan(0)));
-
-        // Ma PUT non funziona più
-        given()
-                .header("Authorization", "Bearer " + access)
-                .contentType(ContentType.JSON)
-                .body("{\"widgets\":[{\"type\":\"NOTES\",\"x\":0,\"y\":0,\"w\":8,\"h\":6,\"z\":0}]}")
-                .when().put("/characters/" + id + "/layout")
-                .then().statusCode(402);
-    }
-
     // ==================================================================
     //                          helpers
     // ==================================================================
-
-    private void promoteToPremium(String email) {
-        mongoClient.getDatabase(dbName).getCollection("users").updateOne(
-                Filters.eq("email", email),
-                Updates.combine(
-                        Updates.set("tier", "PREMIUM"),
-                        Updates.set("premiumSince", java.time.Instant.now()),
-                        Updates.set("premiumSource", "ADMIN_GRANT")));
-    }
-
-    private void demoteToFree(String email) {
-        mongoClient.getDatabase(dbName).getCollection("users").updateOne(
-                Filters.eq("email", email),
-                Updates.combine(
-                        Updates.set("tier", "FREE"),
-                        Updates.set("premiumSince", null),
-                        Updates.set("premiumSource", null)));
-    }
 
     private String createCharacter(String access, String jsonBody) {
         return given()

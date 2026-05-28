@@ -13,7 +13,10 @@ import java.util.Optional;
 
 /**
  * Logica per il layout della dashboard di una scheda. Operazioni:
- * GET (libero), PUT (premium-only), DELETE (libero — reset a default).
+ * GET / PUT / DELETE — tutte libere per ogni utente (free o premium).
+ * Il layout dinamico è incluso nel piano gratuito (sulla 1ª scheda
+ * disponibile); il paywall scatta solo sulla creazione di schede ulteriori
+ * (vedi {@link CharacterService}).
  * Ownership: passa per {@link CharacterService#get} che restituisce 404 se
  * la scheda non appartiene all'owner.
  */
@@ -63,10 +66,10 @@ public class CharacterLayoutService {
 
     /**
      * Salva il layout (upsert: crea se non esiste, sostituisce widget se esiste).
-     * Solo utenti PREMIUM (o ADMIN) possono salvare. FREE → 402 TIER_LIMIT_REACHED.
+     * Disponibile a tutti gli utenti sulle proprie schede — il gate sul piano
+     * gratuito è in {@link CharacterService#enforceCharacterLimit}.
      */
     public CharacterLayout save(User owner, String characterId, CharacterLayoutPayload payload) {
-        enforcePremium(owner);
         Character c = characterService.get(owner, characterId);
 
         validateWidgets(payload);
@@ -106,12 +109,6 @@ public class CharacterLayoutService {
     }
 
     // ----- helpers -----
-
-    private void enforcePremium(User owner) {
-        if (owner.isPremium() || owner.isAdmin()) return;
-        throw AppException.paymentRequired("TIER_LIMIT_REACHED",
-                "Il layout personalizzato è una funzionalità Premium. Passa a Premium per personalizzare la dashboard.");
-    }
 
     private void validateWidgets(CharacterLayoutPayload payload) {
         var seenTypes = new java.util.HashSet<String>();

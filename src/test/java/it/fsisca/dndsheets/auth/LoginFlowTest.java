@@ -265,7 +265,7 @@ class LoginFlowTest {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"email":"%s","password":"%s","username":"%s","displayName":"%s","acceptPrivacy":true}
+                      {"email":"%s","password":"%s","username":"%s","displayName":"%s","acceptPrivacy":true,"declareMinAge":true}
                       """.formatted(email, password, username, username))
                 .when().post("/auth/register")
                 .then().statusCode(201);

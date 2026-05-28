@@ -218,7 +218,7 @@ class DiceRollResourceTest {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
-                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s","acceptPrivacy":true}
+                      {"email":"%s","password":"Password123","username":"%s","displayName":"%s","acceptPrivacy":true,"declareMinAge":true}
                       """.formatted(email, username, username))
                 .when().post("/auth/register")
                 .then().statusCode(201);

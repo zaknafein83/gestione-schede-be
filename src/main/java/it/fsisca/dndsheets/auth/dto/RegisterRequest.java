@@ -15,6 +15,11 @@ import jakarta.validation.constraints.Size;
  * frontend deve mostrare un checkbox esplicito linkato a Privacy Policy
  * e ToS, e inviare {@code true} solo se l'utente ha realmente spuntato.
  * Inviare {@code false} produce 400 PRIVACY_NOT_ACCEPTED.</p>
+ *
+ * <p>{@code declareMinAge} e' l'autocertificazione di eta' minima richiesta
+ * dall'art. 8 GDPR + art. 2-quinquies D.Lgs 101/2018 (soglia 14 anni in
+ * Italia). Checkbox dedicata, separata da {@code acceptPrivacy} per evitare
+ * bundled consent. Inviare {@code false} produce 400.</p>
  */
 public record RegisterRequest(
         @NotBlank @Email @Size(max = 254) String email,
@@ -35,5 +40,8 @@ public record RegisterRequest(
         String displayName,
 
         @AssertTrue(message = "Devi accettare la Privacy Policy e i Termini di Servizio per registrarti")
-        boolean acceptPrivacy
+        boolean acceptPrivacy,
+
+        @AssertTrue(message = "Devi dichiarare di avere almeno 14 anni per registrarti")
+        boolean declareMinAge
 ) {}

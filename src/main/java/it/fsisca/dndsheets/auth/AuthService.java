@@ -70,6 +70,9 @@ public class AuthService {
         // Proof of consent GDPR (art. 7(1)): la @AssertTrue su acceptPrivacy
         // garantisce che siamo qui solo se l'utente ha spuntato il flag.
         user.privacyAcceptedAt  = now;
+        // Autocertificazione eta' minima (art. 8 GDPR + art. 2-quinquies
+        // D.Lgs 101/2018): @AssertTrue su declareMinAge ci garantisce idem.
+        user.ageDeclaredAt      = now;
         user.applyDefaults();  // tier=FREE, roles=[]
         user.persist();
 
@@ -334,10 +337,16 @@ public class AuthService {
             return issueLoginResponse(user);
         }
 
-        // 3) Nuova registrazione via Google. Acccept privacy obbligatorio.
+        // 3) Nuova registrazione via Google. Acccept privacy + dichiarazione
+        // eta' minima obbligatori (stessa semantica di POST /auth/register,
+        // ma validati nel service perche' i campi non sono @AssertTrue).
         if (!req.acceptPrivacy()) {
             throw AppException.badRequest("PRIVACY_NOT_ACCEPTED",
                     "Devi accettare la Privacy Policy e i Termini di Servizio per registrarti");
+        }
+        if (!req.declareMinAge()) {
+            throw AppException.badRequest("AGE_NOT_DECLARED",
+                    "Devi dichiarare di avere almeno 14 anni per registrarti");
         }
 
         User user = new User();
@@ -350,6 +359,7 @@ public class AuthService {
         user.createdAt         = now;
         user.updatedAt         = now;
         user.privacyAcceptedAt = now;
+        user.ageDeclaredAt     = now;
         user.applyDefaults();
         user.persist();
         LOG.infof("googleLogin: nuovo utente registrato via Google %s (username=%s)",

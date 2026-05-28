@@ -128,6 +128,7 @@ public class ExportService {
         m.put("createdAt",          toIso(u.createdAt));
         m.put("updatedAt",          toIso(u.updatedAt));
         m.put("privacyAcceptedAt",  toIso(u.privacyAcceptedAt));
+        m.put("ageDeclaredAt",      toIso(u.ageDeclaredAt));
         return m;
     }
 

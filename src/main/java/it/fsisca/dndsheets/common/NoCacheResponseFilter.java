@@ -19,6 +19,10 @@ import jakarta.ws.rs.ext.Provider;
  *
  * <p>Mantenuto solo per le GET: le altre operazioni (POST/PATCH/PUT/DELETE)
  * non sono cacheabili by HTTP spec e non necessitano dell'header.</p>
+ *
+ * <p>Eccezione: se il Resource ha gia' impostato esplicitamente
+ * {@code Cache-Control} (es. dati statici pubblici come il catalogo SRD),
+ * NON sovrascriviamo. L'endpoint ha la priorita' sul filter generico.</p>
  */
 @Provider
 public class NoCacheResponseFilter implements ContainerResponseFilter {
@@ -26,10 +30,13 @@ public class NoCacheResponseFilter implements ContainerResponseFilter {
     @Override
     public void filter(ContainerRequestContext request,
                        ContainerResponseContext response) {
-        if ("GET".equalsIgnoreCase(request.getMethod())) {
-            response.getHeaders().putSingle(HttpHeaders.CACHE_CONTROL,
-                    "no-store, must-revalidate");
-            response.getHeaders().putSingle("Pragma", "no-cache");
+        if (!"GET".equalsIgnoreCase(request.getMethod())) return;
+        if (response.getHeaderString(HttpHeaders.CACHE_CONTROL) != null) {
+            // L'endpoint ha gia' definito la sua policy: lasciamo stare.
+            return;
         }
+        response.getHeaders().putSingle(HttpHeaders.CACHE_CONTROL,
+                "no-store, must-revalidate");
+        response.getHeaders().putSingle("Pragma", "no-cache");
     }
 }

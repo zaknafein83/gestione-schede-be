@@ -23,36 +23,26 @@ public class SpellCatalogService {
     /**
      * Ricerca con filtri opzionali. Tutti i parametri sono nullable.
      *
-     * @param q          stringa di ricerca case-insensitive su {@code name}
-     *                   (match in qualunque posizione)
-     * @param level      livello esatto (0 = trucchetto)
-     * @param school     scuola in EN (case-insensitive, match esatto)
-     * @param className  classe in EN (case-insensitive, match esatto su elemento della lista)
-     * @param offset     0-based
-     * @param limit      max {@link #MAX_LIMIT}
+     * @param q             stringa di ricerca case-insensitive sul nome,
+     *                      sia EN canonico ({@code name}) sia traduzione IT
+     *                      ({@code translations.it.name}). Match in qualunque
+     *                      posizione.
+     * @param level         livello esatto (0 = trucchetto)
+     * @param school        scuola in EN (case-insensitive, match esatto)
+     * @param className     classe in EN (case-insensitive, match esatto su elemento)
+     * @param ritual        se non null, filtra per ritual={true|false}
+     * @param concentration se non null, filtra per concentration={true|false}
+     * @param offset        0-based
+     * @param limit         max {@link #MAX_LIMIT}
      */
     public List<SpellCatalogEntry> search(String q, Integer level, String school, String className,
+                                          Boolean ritual, Boolean concentration,
                                           int offset, int limit) {
         if (limit <= 0)         limit = 20;
         if (limit > MAX_LIMIT)  limit = MAX_LIMIT;
         if (offset < 0)         offset = 0;
 
-        Document filter = new Document();
-        if (q != null && !q.isBlank()) {
-            String safe = Pattern.quote(q.trim());
-            filter.append("name", new Document("$regex", safe).append("$options", "i"));
-        }
-        if (level != null) {
-            filter.append("level", level);
-        }
-        if (school != null && !school.isBlank()) {
-            filter.append("school", new Document("$regex", "^" + Pattern.quote(school.trim()) + "$")
-                    .append("$options", "i"));
-        }
-        if (className != null && !className.isBlank()) {
-            filter.append("classes", new Document("$regex", "^" + Pattern.quote(className.trim()) + "$")
-                    .append("$options", "i"));
-        }
+        Document filter = buildFilter(q, level, school, className, ritual, concentration);
 
         Bson sort = Sorts.orderBy(Sorts.ascending("level"), Sorts.ascending("name"));
         PanacheQuery<SpellCatalogEntry> query = SpellCatalogEntry.find(filter, sort);
@@ -64,10 +54,27 @@ public class SpellCatalogService {
     }
 
     /** Conta totale per la search (per i contatori UI), stessi filtri. */
-    public long count(String q, Integer level, String school, String className) {
+    public long count(String q, Integer level, String school, String className,
+                      Boolean ritual, Boolean concentration) {
+        Document filter = buildFilter(q, level, school, className, ritual, concentration);
+        return SpellCatalogEntry.count(filter);
+    }
+
+    /**
+     * Costruisce il filtro Mongo unificato per search e count.
+     * La ricerca testuale (q) usa {@code $or} su EN canonico e traduzione IT
+     * cosi' che l'utente possa cercare sia "fire" sia "palla di fuoco".
+     */
+    private Document buildFilter(String q, Integer level, String school, String className,
+                                 Boolean ritual, Boolean concentration) {
         Document filter = new Document();
         if (q != null && !q.isBlank()) {
-            filter.append("name", new Document("$regex", Pattern.quote(q.trim())).append("$options", "i"));
+            String safe = Pattern.quote(q.trim());
+            Document regex = new Document("$regex", safe).append("$options", "i");
+            filter.append("$or", List.of(
+                    new Document("name", regex),
+                    new Document("translations.it.name", regex)
+            ));
         }
         if (level != null) {
             filter.append("level", level);
@@ -80,7 +87,13 @@ public class SpellCatalogService {
             filter.append("classes", new Document("$regex", "^" + Pattern.quote(className.trim()) + "$")
                     .append("$options", "i"));
         }
-        return SpellCatalogEntry.count(filter);
+        if (ritual != null) {
+            filter.append("ritual", ritual);
+        }
+        if (concentration != null) {
+            filter.append("concentration", concentration);
+        }
+        return filter;
     }
 
     /**

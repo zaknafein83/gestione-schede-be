@@ -56,9 +56,13 @@ public class SpellCatalogResource {
             @QueryParam("level")                              Integer level,
             @QueryParam("school")                             String  school,
             @QueryParam("className")                          String  className,
+            @QueryParam("ritual")                             Boolean ritual,
+            @QueryParam("concentration")                      Boolean concentration,
             @QueryParam("offset") @DefaultValue("0")          int     offset,
             @QueryParam("limit")  @DefaultValue("20")         int     limit) {
-        List<SpellSummary> body = service.search(q, level, school, className, offset, limit).stream()
+        List<SpellSummary> body = service
+                .search(q, level, school, className, ritual, concentration, offset, limit)
+                .stream()
                 .map(SpellSummary::from)
                 .toList();
         return Response.ok(body).cacheControl(PUBLIC_1H).build();
@@ -67,11 +71,13 @@ public class SpellCatalogResource {
     @GET
     @Path("/count")
     public Response count(
-            @QueryParam("q")         String  q,
-            @QueryParam("level")     Integer level,
-            @QueryParam("school")    String  school,
-            @QueryParam("className") String  className) {
-        long n = service.count(q, level, school, className);
+            @QueryParam("q")             String  q,
+            @QueryParam("level")         Integer level,
+            @QueryParam("school")        String  school,
+            @QueryParam("className")     String  className,
+            @QueryParam("ritual")        Boolean ritual,
+            @QueryParam("concentration") Boolean concentration) {
+        long n = service.count(q, level, school, className, ritual, concentration);
         return Response.ok(n).cacheControl(PUBLIC_1H).build();
     }
 

@@ -59,9 +59,12 @@ class SpellCatalogResourceTest {
     }
 
     @Test
-    @DisplayName("GET /spells: senza token → 401")
-    void requiresAuth() {
-        given().when().get("/spells").then().statusCode(401);
+    @DisplayName("GET /spells: pubblico — accesso senza token → 200 + Cache-Control public")
+    void publicAccessNoToken() {
+        given().when().get("/spells")
+                .then()
+                .statusCode(200)
+                .header("Cache-Control", org.hamcrest.Matchers.containsString("max-age=3600"));
     }
 
     @Test

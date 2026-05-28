@@ -125,6 +125,17 @@ public class MongoIndexes {
                 Indexes.ascending("adminId"),
                 new IndexOptions().name("idx_admin_actions_admin"));
 
+        // Payment events (Stripe webhook idempotency + audit)
+        db.getCollection("payment_events").createIndex(
+                Indexes.ascending("stripeEventId"),
+                new IndexOptions().unique(true).name("uniq_payevt_stripeid"));
+        db.getCollection("payment_events").createIndex(
+                Indexes.ascending("userId"),
+                new IndexOptions().name("idx_payevt_userid"));
+        db.getCollection("payment_events").createIndex(
+                Indexes.descending("createdAt"),
+                new IndexOptions().name("idx_payevt_createdAt"));
+
         LOG.info("Indici Mongo verificati/creati");
 
         // Migration soft: popola tier/roles sugli utenti esistenti.

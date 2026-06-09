@@ -21,9 +21,15 @@ import jakarta.validation.constraints.NotBlank;
  * con la stessa semantica di {@code acceptPrivacy}: richiesta solo al primo
  * accesso, ignorata sui successivi. Non {@code @AssertTrue} per lo stesso
  * motivo. Il service rifiuta con {@code 400 AGE_NOT_DECLARED}.</p>
+ *
+ * <p>{@code username} e' opzionale: se valorizzato al PRIMO accesso (nuova
+ * registrazione) viene usato come username dell'account, dopo validazione
+ * formato/unicita' nel service. Se {@code null}/blank lo username viene
+ * derivato automaticamente dall'email. Ignorato sui login successivi.</p>
  */
 public record GoogleLoginRequest(
         @NotBlank String idToken,
         boolean acceptPrivacy,
-        boolean declareMinAge
+        boolean declareMinAge,
+        String username
 ) {}

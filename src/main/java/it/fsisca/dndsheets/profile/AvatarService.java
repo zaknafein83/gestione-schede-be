@@ -8,6 +8,7 @@ import com.mongodb.client.gridfs.model.GridFSFile;
 import com.mongodb.client.gridfs.model.GridFSUploadOptions;
 import it.fsisca.dndsheets.auth.User;
 import it.fsisca.dndsheets.common.AppException;
+import it.fsisca.dndsheets.common.ImageMagic;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.bson.Document;
@@ -54,7 +55,7 @@ public class AvatarService {
      * Se l'utente aveva gia' un avatar, quello vecchio viene rimosso da GridFS.
      */
     public ObjectId upload(User user, Path filePath, String contentType, long size, String originalName) {
-        validate(contentType, size);
+        validate(contentType, size, filePath);
 
         ObjectId previous = user.avatarFileId;
 
@@ -106,7 +107,7 @@ public class AvatarService {
 
     // ----- helpers -----
 
-    private void validate(String contentType, long size) {
+    private void validate(String contentType, long size, Path filePath) {
         if (size <= 0) {
             throw AppException.badRequest("EMPTY_FILE", "File vuoto");
         }
@@ -117,6 +118,12 @@ public class AvatarService {
         if (contentType == null || !ALLOWED_TYPES.contains(contentType.toLowerCase())) {
             throw AppException.badRequest("UNSUPPORTED_MEDIA_TYPE",
                     "Tipo non supportato. Usa JPEG, PNG o WebP");
+        }
+        // Non fidarsi del Content-Type dichiarato: verifica i magic bytes.
+        String sniffed = ImageMagic.detect(filePath);
+        if (sniffed == null || !ALLOWED_TYPES.contains(sniffed)) {
+            throw AppException.badRequest("UNSUPPORTED_MEDIA_TYPE",
+                    "Il contenuto del file non e' un'immagine JPEG, PNG o WebP valida");
         }
     }
 

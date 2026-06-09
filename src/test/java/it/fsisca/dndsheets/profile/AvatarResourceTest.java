@@ -38,8 +38,9 @@ class AvatarResourceTest {
 
     private static final Pattern TOKEN_LINK_PATTERN = Pattern.compile("token=([A-Za-z0-9_-]+)");
 
-    // Magic bytes minimi di un PNG (header + IEND). Il backend non valida i bytes,
-    // solo il content-type. Va bene per testing.
+    // PNG minimo (header 8 byte + IEND). I primi 8 byte sono la firma reale
+    // riconosciuta da ImageMagic.detect(), quindi passa la validazione
+    // magic-bytes oltre a quella sul content-type.
     private static final byte[] FAKE_PNG = {
             (byte)0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n',
             // dummy payload

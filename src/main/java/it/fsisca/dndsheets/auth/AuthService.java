@@ -353,7 +353,7 @@ public class AuthService {
         user.email             = email;
         user.passwordHash      = null;  // social-only
         user.emailVerified     = true;  // Google ha gia' verificato
-        user.username          = deriveUniqueUsername(email);
+        user.username          = resolveGoogleUsername(req.username(), email);
         user.displayName       = chooseDisplayName(identity, email);
         user.googleSub         = identity.sub();
         user.createdAt         = now;
@@ -372,6 +372,35 @@ public class AuthService {
         String accessToken  = jwtService.issueAccessToken(user);
         String refreshPlain = issueRefreshToken(user);
         return new LoginResponse(accessToken, refreshPlain, UserResponse.from(user));
+    }
+
+    /** Vincolo formato username, identico a {@link RegisterRequest}. */
+    private static final java.util.regex.Pattern USERNAME_PATTERN =
+            java.util.regex.Pattern.compile("^[a-zA-Z0-9_]+$");
+
+    /**
+     * Risolve lo username per una nuova registrazione via Google.
+     *
+     * <p>Se l'utente ne ha scelto uno esplicitamente (flusso "completa
+     * registrazione") lo validiamo per formato e unicita' con le stesse regole
+     * di {@code POST /auth/register}. Se invece e' {@code null}/blank ricadiamo
+     * sulla derivazione automatica dall'email.</p>
+     */
+    private String resolveGoogleUsername(String requested, String email) {
+        if (requested == null || requested.isBlank()) {
+            return deriveUniqueUsername(email);
+        }
+        String username = requested.trim();
+        if (username.length() < 3 || username.length() > 30
+                || !USERNAME_PATTERN.matcher(username).matches()) {
+            throw AppException.badRequest("INVALID_USERNAME",
+                    "Username puo' contenere solo lettere, numeri e underscore (3-30 caratteri)");
+        }
+        if (User.existsByUsername(username)) {
+            throw AppException.conflict("USERNAME_ALREADY_USED",
+                    "Lo username e' gia' in uso");
+        }
+        return username;
     }
 
     /**

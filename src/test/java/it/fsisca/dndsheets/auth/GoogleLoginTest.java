@@ -134,6 +134,80 @@ class GoogleLoginTest {
     }
 
     @Test
+    @DisplayName("nuovo utente: username scelto esplicitamente → usato così com'e'")
+    void newUserChosenUsername() {
+        FakeGoogleTokenVerifier.setNext(new GoogleTokenVerifier.GoogleIdentity(
+                "google-sub-u", "marco.puntillo@hotmail.it", true, "Marco P.", null));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                      {"idToken":"x","acceptPrivacy":true,"declareMinAge":true,"username":"DrizztDoUrden"}
+                      """)
+                .when().post("/auth/google")
+                .then()
+                .statusCode(200)
+                .body("user.username", equalTo("DrizztDoUrden"));
+    }
+
+    @Test
+    @DisplayName("nuovo utente: username scelto gia' in uso → 409 USERNAME_ALREADY_USED")
+    void newUserChosenUsernameTaken() {
+        registerStandard("altro@example.com", "DrizztDoUrden");
+
+        FakeGoogleTokenVerifier.setNext(new GoogleTokenVerifier.GoogleIdentity(
+                "google-sub-u2", "nuovo@example.com", true, "Nuovo", null));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                      {"idToken":"x","acceptPrivacy":true,"declareMinAge":true,"username":"DrizztDoUrden"}
+                      """)
+                .when().post("/auth/google")
+                .then()
+                .statusCode(409)
+                .body("code", equalTo("USERNAME_ALREADY_USED"));
+
+        long count = mongoClient.getDatabase(dbName).getCollection("users")
+                .countDocuments(new Document("email", "nuovo@example.com"));
+        assertEquals(0L, count, "Non deve creare l'utente se lo username collide");
+    }
+
+    @Test
+    @DisplayName("nuovo utente: username scelto con formato invalido → 400 INVALID_USERNAME")
+    void newUserChosenUsernameInvalid() {
+        FakeGoogleTokenVerifier.setNext(new GoogleTokenVerifier.GoogleIdentity(
+                "google-sub-u3", "nuovo@example.com", true, "Nuovo", null));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                      {"idToken":"x","acceptPrivacy":true,"declareMinAge":true,"username":"ab cd!"}
+                      """)
+                .when().post("/auth/google")
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("INVALID_USERNAME"));
+    }
+
+    @Test
+    @DisplayName("nuovo utente: username blank → fallback alla derivazione dall'email")
+    void newUserBlankUsernameFallsBack() {
+        FakeGoogleTokenVerifier.setNext(new GoogleTokenVerifier.GoogleIdentity(
+                "google-sub-u4", "marco.puntillo@hotmail.it", true, "Marco P.", null));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                      {"idToken":"x","acceptPrivacy":true,"declareMinAge":true,"username":"   "}
+                      """)
+                .when().post("/auth/google")
+                .then()
+                .statusCode(200)
+                .body("user.username", equalTo("marco_puntillo"));
+    }
+
+    @Test
     @DisplayName("nuovo utente: acceptPrivacy=false → 400 PRIVACY_NOT_ACCEPTED")
     void newUserMissingPrivacy() {
         FakeGoogleTokenVerifier.setNext(new GoogleTokenVerifier.GoogleIdentity(

@@ -53,6 +53,10 @@ public class CharacterService {
      */
     private void enforceTierLimit(User owner) {
         if (owner.isPremium() || owner.isAdmin()) return;
+        // NB: check-then-act non atomico. Due create() concorrenti dello stesso
+        // utente FREE potrebbero entrambe leggere current=0 e creare 2 schede.
+        // Rischio accettato: impatto banale (limite=1, si sblocca con Premium),
+        // niente lock distribuito o transazioni Mongo per un singolo host.
         long current = Character.count("ownerId", owner.id);
         if (current >= freeTierMaxCharacters) {
             throw AppException.paymentRequired("TIER_LIMIT_REACHED",

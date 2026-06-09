@@ -55,6 +55,13 @@ public class ProfileService {
      * rifare login su tutti i device).
      */
     public void changePassword(User user, ChangePasswordRequest req) {
+        // Account social-only (registrati via Google): passwordHash e' null e
+        // verify() lancerebbe. Diamo un errore parlante invece di un 500.
+        if (user.passwordHash == null) {
+            throw AppException.badRequest("NO_PASSWORD_SET",
+                    "Il tuo account non ha una password (accesso con Google). "
+                    + "Usa il login Google per accedere.");
+        }
         if (!passwordHasher.verify(req.currentPassword(), user.passwordHash)) {
             throw AppException.unauthorized("INVALID_CURRENT_PASSWORD",
                     "La password attuale non e' corretta");

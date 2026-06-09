@@ -21,7 +21,7 @@ public class User extends PanacheMongoEntity {
 
     public static final String SRC_IAP_GOOGLE  = "IAP_GOOGLE";
     public static final String SRC_IAP_APPLE   = "IAP_APPLE";
-    public static final String SRC_STRIPE      = "STRIPE";
+    public static final String SRC_PADDLE      = "PADDLE";
     public static final String SRC_ADMIN_GRANT = "ADMIN_GRANT";
 
     public static final String ROLE_ADMIN = "ADMIN";
@@ -71,7 +71,7 @@ public class User extends PanacheMongoEntity {
     public String tier;
     /** Quando l'utente e' diventato premium. Null se FREE. */
     public Instant premiumSince;
-    /** Canale che ha generato il premium: IAP_GOOGLE/IAP_APPLE/STRIPE/ADMIN_GRANT. Null se FREE. */
+    /** Canale che ha generato il premium: IAP_GOOGLE/IAP_APPLE/PADDLE/ADMIN_GRANT. Null se FREE. */
     public String premiumSource;
     /** Ruoli applicativi. Per ora solo "ADMIN". Set vuoto per utente normale. */
     public Set<String> roles;

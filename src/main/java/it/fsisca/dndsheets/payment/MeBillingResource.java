@@ -1,10 +1,9 @@
 package it.fsisca.dndsheets.payment;
 
-import com.stripe.model.checkout.Session;
 import io.quarkus.security.Authenticated;
 import it.fsisca.dndsheets.auth.User;
 import it.fsisca.dndsheets.common.AppException;
-import it.fsisca.dndsheets.payment.dto.CheckoutSessionResponse;
+import it.fsisca.dndsheets.payment.dto.CheckoutResponse;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -15,28 +14,27 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 /**
- * Endpoint autenticati per il flusso di pagamento Stripe lato utente.
- * Il webhook (publico) e' in {@link StripeWebhookResource}.
+ * Endpoint autenticati per il flusso di pagamento Premium lato utente.
+ * Il webhook (pubblico) e' in {@link BillingWebhookResource}.
  */
-@Path("/me/stripe")
+@Path("/me/billing")
 @Produces(MediaType.APPLICATION_JSON)
 @Authenticated
-@Tag(name = "payment", description = "Pagamenti Premium via Stripe")
-public class MeStripeResource {
+@Tag(name = "payment", description = "Pagamenti Premium via Paddle")
+public class MeBillingResource {
 
     @Inject JsonWebToken  jwt;
-    @Inject StripeService stripeService;
+    @Inject PaddleService paddleService;
 
     /**
-     * Crea una Stripe Checkout Session per l'acquisto Premium e ritorna
-     * l'URL hosted page su cui il frontend deve redirigere l'utente.
+     * Costruisce l'URL della pagina di checkout per l'utente corrente e lo
+     * ritorna. L'id utente viene messo server-side dal JWT (non spoofabile).
      */
     @POST
-    @Path("/checkout-session")
-    public CheckoutSessionResponse createCheckoutSession() {
+    @Path("/checkout")
+    public CheckoutResponse createCheckout() {
         User user = currentUser();
-        Session session = stripeService.createCheckoutSession(user);
-        return new CheckoutSessionResponse(session.getId(), session.getUrl());
+        return new CheckoutResponse(paddleService.buildCheckoutUrl(user));
     }
 
     private User currentUser() {

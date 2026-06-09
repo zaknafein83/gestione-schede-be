@@ -22,14 +22,13 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 
 /**
- * Test "Stripe not configured": senza env vars popolate, i due endpoint
- * devono rispondere 503 STRIPE_NOT_CONFIGURED, oppure 400 sulla validation
- * preliminare del payload/firma. La config reale verra' testata
- * solo manualmente in TEST mode con le sk_test di Stripe.
+ * Test "Paddle not configured": senza env vars popolate, gli endpoint protetti
+ * rispondono 503 PADDLE_NOT_CONFIGURED (o 400/401 sulla validation preliminare),
+ * mentre /billing/config ritorna sempre 200 con enabled=false.
  */
 @QuarkusTest
-@DisplayName("Stripe — endpoint senza configurazione")
-class StripeNotConfiguredTest {
+@DisplayName("Paddle — endpoint senza configurazione")
+class PaddleNotConfiguredTest {
 
     private static final Pattern TOKEN_LINK_PATTERN = Pattern.compile("token=([A-Za-z0-9_-]+)");
 
@@ -54,46 +53,56 @@ class StripeNotConfiguredTest {
     }
 
     @Test
-    @DisplayName("POST /me/stripe/checkout-session senza JWT → 401")
-    void checkoutSessionRequiresAuth() {
+    @DisplayName("POST /me/billing/checkout senza JWT → 401")
+    void checkoutRequiresAuth() {
         given()
-                .when().post("/me/stripe/checkout-session")
+                .when().post("/me/billing/checkout")
                 .then().statusCode(401);
     }
 
     @Test
-    @DisplayName("POST /me/stripe/checkout-session con JWT ma Stripe non configurato → 503")
-    void checkoutSessionNotConfigured() {
+    @DisplayName("POST /me/billing/checkout con JWT ma Paddle non configurato → 503")
+    void checkoutNotConfigured() {
         String access = registerAndLogin("frank@example.com", "frank");
         given()
                 .header("Authorization", "Bearer " + access)
-                .when().post("/me/stripe/checkout-session")
+                .when().post("/me/billing/checkout")
                 .then()
                 .statusCode(503)
-                .body("code", equalTo("STRIPE_NOT_CONFIGURED"));
+                .body("code", equalTo("PADDLE_NOT_CONFIGURED"));
     }
 
     @Test
-    @DisplayName("POST /stripe/webhook senza header Stripe-Signature → 400")
+    @DisplayName("POST /billing/webhook senza header Paddle-Signature → 400")
     void webhookMissingSignature() {
         given()
                 .contentType(ContentType.JSON)
-                .body("{\"id\":\"evt_x\",\"type\":\"checkout.session.completed\"}")
-                .when().post("/stripe/webhook")
+                .body("{\"event_id\":\"evt_x\",\"event_type\":\"transaction.completed\"}")
+                .when().post("/billing/webhook")
                 .then().statusCode(400);
     }
 
     @Test
-    @DisplayName("POST /stripe/webhook con signature dummy ma Stripe non configurato → 503")
+    @DisplayName("POST /billing/webhook con signature dummy ma Paddle non configurato → 503")
     void webhookNotConfigured() {
         given()
-                .header("Stripe-Signature", "t=1,v1=dummy")
+                .header("Paddle-Signature", "ts=1;h1=dummy")
                 .contentType(ContentType.JSON)
-                .body("{\"id\":\"evt_x\",\"type\":\"checkout.session.completed\"}")
-                .when().post("/stripe/webhook")
+                .body("{\"event_id\":\"evt_x\",\"event_type\":\"transaction.completed\"}")
+                .when().post("/billing/webhook")
                 .then()
                 .statusCode(503)
-                .body("code", equalTo("STRIPE_NOT_CONFIGURED"));
+                .body("code", equalTo("PADDLE_NOT_CONFIGURED"));
+    }
+
+    @Test
+    @DisplayName("GET /billing/config senza configurazione → 200 enabled=false")
+    void configDisabledWhenNotConfigured() {
+        given()
+                .when().get("/billing/config")
+                .then()
+                .statusCode(200)
+                .body("enabled", equalTo(false));
     }
 
     // ----- helpers -----

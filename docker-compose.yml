@@ -59,15 +59,18 @@ services:
       JWT_PRIVATE_KEY_PATH: file:/keys/privateKey.pem
       # Google OAuth Web Client ID per POST /auth/google (vuoto -> endpoint 503).
       GOOGLE_CLIENT_ID_WEB: ${GOOGLE_CLIENT_ID_WEB:-}
-      # Stripe Premium pagamenti (vuoto -> /me/stripe/* + /stripe/webhook 503).
-      # NB: STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL NON sono dichiarate qui:
-      # cosi' restano "unset" lato container e Quarkus applica il default
-      # da application.properties (basato su APP_BASE_URL). Se le mettiamo
-      # con `${VAR:-}` arrivano come stringhe vuote e il default NON scatta
-      # (Quarkus interpreta "" come valore valido), rompendo isConfigured().
-      STRIPE_SECRET_KEY:     ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      STRIPE_PRICE_ID:       ${STRIPE_PRICE_ID:-}
+      # Paddle Premium pagamenti (Merchant of Record sul web). Vuoti -> /me/billing/*
+      # e /billing/webhook rispondono 503; /billing/config ritorna enabled=false.
+      #  - PADDLE_CLIENT_TOKEN:   test_... (sandbox) / live_... (prod)
+      #  - PADDLE_PRICE_ID:       pri_... del prezzo one-time "Premium Lifetime"
+      #  - PADDLE_WEBHOOK_SECRET: pdl_ntfset_... (signing secret della destination)
+      #  - PADDLE_ENVIRONMENT:    sandbox | production (default production)
+      #  - PADDLE_API_KEY:        riservato a uso futuro (reconciliation)
+      PADDLE_CLIENT_TOKEN:   ${PADDLE_CLIENT_TOKEN:-}
+      PADDLE_PRICE_ID:       ${PADDLE_PRICE_ID:-}
+      PADDLE_WEBHOOK_SECRET: ${PADDLE_WEBHOOK_SECRET:-}
+      PADDLE_ENVIRONMENT:    ${PADDLE_ENVIRONMENT:-production}
+      PADDLE_API_KEY:        ${PADDLE_API_KEY:-}
     volumes:
       # Generate una volta sull'host (vedi README), chmod 600 owner deploy:
       #   openssl genrsa -out privateKey.pem 2048

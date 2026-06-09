@@ -106,12 +106,9 @@
             </exclusions>
         </dependency>
 
-        <!-- Stripe Java SDK per Checkout Session + verifica firma webhook. -->
-        <dependency>
-            <groupId>com.stripe</groupId>
-            <artifactId>stripe-java</artifactId>
-            <version>32.1.0</version>
-        </dependency>
+        <!-- Paddle (Merchant of Record): nessun SDK Java. La verifica firma del
+             webhook usa HMAC-SHA256 (javax.crypto) e il JSON e' parsato con
+             Jackson (quarkus-rest-jackson, gia' presente). -->
 
         <dependency>
             <groupId>io.quarkus</groupId>

@@ -125,16 +125,25 @@ public class MongoIndexes {
                 Indexes.ascending("adminId"),
                 new IndexOptions().name("idx_admin_actions_admin"));
 
-        // Payment events (Stripe webhook idempotency + audit)
+        // Payment events (Paddle webhook idempotency + audit).
+        // Migrazione: rimuovi il vecchio indice unique su stripeEventId (era
+        // Stripe). I nuovi documenti non hanno quel campo: lasciarlo causerebbe
+        // collisione su null al secondo insert. Idempotente: ignora se assente.
+        try {
+            db.getCollection("payment_events").dropIndex("uniq_payevt_stripeid");
+            LOG.info("Rimosso vecchio indice uniq_payevt_stripeid (migrazione Stripe→Paddle)");
+        } catch (RuntimeException ignored) {
+            // L'indice non esiste (DB nuovo o gia' migrato): nulla da fare.
+        }
         db.getCollection("payment_events").createIndex(
-                Indexes.ascending("stripeEventId"),
-                new IndexOptions().unique(true).name("uniq_payevt_stripeid"));
+                Indexes.ascending("eventId"),
+                new IndexOptions().unique(true).name("uniq_payevt_eventid"));
         db.getCollection("payment_events").createIndex(
                 Indexes.ascending("userId"),
                 new IndexOptions().name("idx_payevt_userid"));
         db.getCollection("payment_events").createIndex(
-                Indexes.descending("createdAt"),
-                new IndexOptions().name("idx_payevt_createdAt"));
+                Indexes.descending("processedAt"),
+                new IndexOptions().name("idx_payevt_processedAt"));
 
         LOG.info("Indici Mongo verificati/creati");
 

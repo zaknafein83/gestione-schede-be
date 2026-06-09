@@ -7,46 +7,47 @@ import org.bson.types.ObjectId;
 import java.time.Instant;
 
 /**
- * Audit + idempotency record per eventi Stripe processati dal webhook.
+ * Audit + idempotency record per gli eventi webhook ricevuti dal processore
+ * di pagamento (Paddle, Merchant of Record sul canale web).
  *
- * <p>{@code stripeEventId} e' la chiave di idempotency: Stripe puo' consegnare
- * lo stesso evento piu' volte (best-effort delivery) e il backend deve essere
- * resiliente. L'indice univoco su questa colonna garantisce che la seconda
- * insert lanci DuplicateKey, intercettata dal service.</p>
+ * <p>{@code eventId} e' la chiave di idempotency: Paddle puo' consegnare lo
+ * stesso evento piu' volte (retry su risposta non-2xx). L'indice univoco su
+ * questa colonna (vedi {@link it.fsisca.dndsheets.common.MongoIndexes}) fa sì
+ * che il service deduplichi prima di riprocessare.</p>
  */
 @MongoEntity(collection = "payment_events")
 public class PaymentEvent extends PanacheMongoEntity {
 
-    /** event.id dal payload Stripe (es. "evt_1NA..."). Univoco. */
-    public String stripeEventId;
+    /** {@code event_id} dal payload Paddle (es. "evt_01h..."). Univoco. */
+    public String eventId;
 
-    /** Tipo evento (es. "checkout.session.completed", "charge.refunded"). */
+    /** Tipo evento (es. "transaction.completed", "adjustment.created"). */
     public String eventType;
 
-    /** Checkout session id (per i checkout.session.*); null per altri eventi. */
-    public String stripeSessionId;
+    /** Transazione Paddle collegata (txn_...); null se l'evento non ne ha una. */
+    public String transactionId;
 
-    /** Customer Stripe (cus_...); null se l'evento e' anonimo. */
-    public String stripeCustomerId;
+    /** Customer Paddle (ctm_...); null se assente nel payload. */
+    public String paddleCustomerId;
 
-    /** ObjectId del nostro {@link it.fsisca.dndsheets.auth.User} (hex). */
+    /** ObjectId del nostro {@link it.fsisca.dndsheets.auth.User}. Null se non risolto. */
     public ObjectId userId;
 
     /** Email dello user al momento dell'evento (snapshot). */
     public String email;
 
-    /** Totale pagato in cents della valuta. */
-    public Long amountTotal;
+    /** Totale in minor units come stringa (Paddle restituisce stringhe, es. "499"). */
+    public String amount;
 
-    /** Codice valuta ISO (es. "eur"). */
+    /** Codice valuta ISO (es. "EUR"). */
     public String currency;
 
-    /** {@code event.created} di Stripe (UTC). */
+    /** {@code occurred_at} di Paddle. */
     public Instant eventCreatedAt;
 
     /** Quando l'abbiamo processato lato server. */
     public Instant processedAt;
 
-    /** Quale azione abbiamo intrapreso (es. "GRANT_PREMIUM", "DOWNGRADE_FREE", "NO_OP"). */
+    /** Azione intrapresa: "GRANT_PREMIUM", "DOWNGRADE_FREE", "NO_OP_*". */
     public String outcome;
 }

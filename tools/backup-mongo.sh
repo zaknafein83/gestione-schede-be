@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SOSTITUITO il 2026-11-06 dallo script unico backup-db.sh del VPS
+# (~/Documents/Progetti/VPS-RUNBOOK.md, sez. 6.3): non più nel crontab.
+# Resta qui solo come riferimento storico.
+#
 # backup-mongo.sh — backup di tutti i container MongoDB attivi sul VPS.
 #
 # Modello parallelo a ~deploy/bin/backup-postgres.sh (vedi VPS-RUNBOOK 6.3).

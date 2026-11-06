@@ -248,7 +248,7 @@ pg.zaknafein.ovh (nginx + Let's Encrypt)
 | [`docker-compose.dev.yml`](docker-compose.dev.yml) | Compose di DEV (mongo + mailpit con porte esposte). Solo locale. |
 | [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) | Test + build + push GHCR + `ssh deploy + compose pull/up` + health check. |
 | [`deploy/nginx-pg.conf`](deploy/nginx-pg.conf) | Vhost nginx "split" (statico + `/api/*` proxy). Va installato a mano sul VPS la prima volta. |
-| [`tools/backup-mongo.sh`](tools/backup-mongo.sh) | Backup giornaliero `mongodump` con retention locale 14gg + upload off-site su Backblaze B2 (GPG-encrypted, retention 30gg) se configurato. Va installato a mano in `~deploy/bin/` sul VPS. |
+| [`tools/backup-mongo.sh`](tools/backup-mongo.sh) | **Non più usato** dal 2026-11-06: il backup di Mongo lo fa lo script unico `backup-db.sh` del VPS (`~/Documents/Progetti/VPS-RUNBOOK.md`, sez. 6.3). Resta come riferimento. |
 
 Il workflow del frontend (Flutter Web build + rsync su `/var/www/pg/`) vive nel repo [`gestione-schede-fe`](https://github.com/zaknafein83/gestione-schede-fe).
 
@@ -302,57 +302,35 @@ sudo nginx -t && sudo systemctl reload nginx
 # 8) Registro porte
 echo "8082  gestione-schede   pg.zaknafein.ovh" | sudo tee -a /opt/.ports-registry
 
-# 9) Backup Mongo: copia tools/backup-mongo.sh in ~deploy/bin/ e schedula
-sudo -u deploy cp /home/deploy/gestione-schede/tools/backup-mongo.sh ~deploy/bin/
-sudo -u deploy chmod +x ~deploy/bin/backup-mongo.sh
-( sudo -u deploy crontab -l 2>/dev/null; echo "15 3 * * * /home/deploy/bin/backup-mongo.sh >> /var/log/backup-mongo.log 2>&1" ) | sudo -u deploy crontab -
+# 9) Backup Mongo: niente da installare per questo progetto. Lo script unico
+#    ~deploy/bin/backup-db.sh del VPS (VPS-RUNBOOK.md, sez. 6.3, che spiega
+#    anche il setup da zero) gira alle 03:00 UTC, trova da solo il container
+#    Mongo e lo salva in /opt/backups/ e, cifrato, su Backblaze B2.
+#    Dopo il primo deploy controlla che il container compaia nella lista:
+sudo -u deploy /home/deploy/bin/backup-db.sh --list   # deve elencare gestione-schede-mongo-1  mongo
 
-# 10) Off-site backup verso Backblaze B2 (opzionale, GPG-encrypted)
-#     - Crea un bucket dedicato su B2 (es. pg-mongo-backups) e una applicationKey
-#       limitata read-write a quel bucket. Annota keyID + applicationKey.
-#     - Genera una passphrase forte e CUSTODISCILA fuori dal VPS (password
-#       manager + carta): senza, i .gpg sono inutilizzabili.
-sudo apt install -y rclone gnupg
-sudo -u deploy rclone config   # nuovo remote "b2" tipo Backblaze B2 (interattivo)
-
-sudo install -d -o deploy -g deploy -m 750 /etc/zaknafein
-sudo -u deploy tee /etc/zaknafein/backup-env > /dev/null <<'EOF'
-# Notifiche (opzionali)
-TG_TOKEN=
-TG_CHAT_ID=
-# Off-site Backblaze B2 (opzionale: lascia vuoti per disabilitare)
-B2_BUCKET=pg-mongo-backups
-B2_RCLONE_REMOTE=b2
-BACKUP_GPG_PASSPHRASE=metti-una-passphrase-forte
-REMOTE_RETENTION_DAYS=30
-EOF
-sudo chmod 600 /etc/zaknafein/backup-env
-
-# Verifica manuale (un giro completo): dump + upload + cleanup
-sudo -u deploy /home/deploy/bin/backup-mongo.sh
-sudo -u deploy rclone ls b2:pg-mongo-backups   # deve mostrare il .gpg appena caricato
-
-# 11) Secrets GitHub (una sola volta per CIASCUN repo): VPS_HOST, VPS_USER, VPS_SSH_KEY
+# 10) Secrets GitHub (una sola volta per CIASCUN repo): VPS_HOST, VPS_USER, VPS_SSH_KEY
 ~/Documents/Progetti/scripts/setup-repo.sh gestione-schede-be
 ~/Documents/Progetti/scripts/setup-repo.sh gestione-schede-fe
 ```
 
-### Restore di un backup off-site
+### Restore di un backup
+
+Le copie degli ultimi 7 giorni stanno sul VPS in
+`/opt/backups/gestione-schede-mongo-1/`, quelle cifrate su B2 in
+`b2:vps-backup-mongo/gestione-schede-mongo-1/`.
 
 ```bash
-# 1) Scarica il .gpg dal bucket B2 (sul VPS o in locale)
-rclone copy b2:pg-mongo-backups/gestione-schede-mongo-1/2026-05-28.archive.gz.gpg ./
+# 1) Solo se sul VPS non c'è più la copia locale: scarica il .gpg da B2 e
+#    decifralo (gpg chiede la passphrase, che sta nel password manager)
+rclone copy b2:vps-backup-mongo/gestione-schede-mongo-1/<data>.archive.gz.gpg ./
+gpg --decrypt <data>.archive.gz.gpg > <data>.archive.gz
 
-# 2) Decifra con la passphrase
-gpg --batch --pinentry-mode loopback \
-    --passphrase 'la-tua-passphrase' \
-    --decrypt 2026-05-28.archive.gz.gpg > 2026-05-28.archive.gz
-
-# 3) Restore dentro al container (sostituisce TUTTO; usare con cautela)
-cat 2026-05-28.archive.gz | docker exec -i gestione-schede-mongo-1 \
-    mongorestore --archive --gzip --drop \
-                 --username "$MONGO_USER" --password "$MONGO_PASSWORD" \
-                 --authenticationDatabase admin
+# 2) Restore dentro al container (sostituisce TUTTO; usare con cautela).
+#    Le credenziali vengono lette dall'env del container.
+docker exec -i gestione-schede-mongo-1 sh -c 'mongorestore --archive --gzip --drop \
+    -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" \
+    --authenticationDatabase admin' < <data>.archive.gz
 ```
 
 Dopo questi step, ogni push su `main` su uno dei due repo triggera il deploy del rispettivo componente.
